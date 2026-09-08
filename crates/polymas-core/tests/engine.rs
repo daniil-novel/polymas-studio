@@ -144,3 +144,121 @@ fn active_agent_cannot_be_archived_and_a_failed_transition_does_not_mutate_queue
         TaskState::Running
     );
 }
+
+#[test]
+fn durable_wait_resumes_on_a_matching_message_or_deadline_without_replaying_a_process() {
+    use polymas_core::{
+        messages::{MessageInput, Router},
+        scheduler::WaitCondition,
+        topology::Edge,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let mut e = engine(dir.path());
+    let ids: Vec<_> = e
+        .workspace
+        .config()
+        .value
+        .registry
+        .agents
+        .iter()
+        .map(|a| a.id.clone())
+        .collect();
+    let mut architecture = e.workspace.config().value.architecture.clone();
+    architecture.edges.push(Edge {
+        from: ids[1].clone(),
+        to: ids[0].clone(),
+    });
+    e.configure(
+        e.workspace.config().revision,
+        ConfigCommand::SetArchitecture {
+            architecture: architecture.clone(),
+        },
+    )
+    .unwrap();
+    let run = e
+        .submit(
+            "wait-run",
+            TaskInput {
+                prompt: "Wait for evidence".into(),
+                ..Default::default()
+            },
+            1,
+        )
+        .unwrap();
+    let task = e.claim(1, "local", 100).unwrap().remove(0);
+    let epoch = task.lease.unwrap().epoch;
+    e.park(
+        &task.id,
+        epoch,
+        WaitCondition {
+            sender: Some(ids[1].clone()),
+            correlation_id: None,
+            deadline_at: 200,
+        },
+        "Waiting".into(),
+        100,
+    )
+    .unwrap();
+    drop(e);
+    let mut e = Engine::open(dir.path()).unwrap();
+    assert_eq!(
+        e.scheduler.task(&task.id).unwrap().state,
+        TaskState::Waiting
+    );
+    assert!(e.wake_waiting(101).unwrap().is_empty());
+    let input = MessageInput {
+        recipient: ids[0].clone(),
+        body: "Wake evidence".into(),
+        ..Default::default()
+    };
+    Router::send(
+        &mut e.workspace.db,
+        &architecture,
+        "other-run",
+        &ids[1],
+        "other",
+        input.clone(),
+        101,
+    )
+    .unwrap();
+    assert!(e.wake_waiting(102).unwrap().is_empty());
+    Router::send(
+        &mut e.workspace.db,
+        &architecture,
+        &run.id,
+        &ids[1],
+        "current",
+        input,
+        102,
+    )
+    .unwrap();
+    assert_eq!(e.wake_waiting(103).unwrap(), vec![task.id.clone()]);
+    assert!(e.wake_waiting(104).unwrap().is_empty());
+    let resumed = e.claim(1, "local", 104).unwrap().remove(0);
+    assert_eq!(resumed.assignee, ids[0]);
+    assert_eq!(resumed.attempt, 2);
+    assert!(resumed.resume_note.is_some());
+    e.park(
+        &task.id,
+        resumed.lease.unwrap().epoch,
+        WaitCondition {
+            sender: Some(ids[1].clone()),
+            correlation_id: Some("not-yet-created-conversation".into()),
+            deadline_at: 110,
+        },
+        "Waiting for a specific reply".into(),
+        104,
+    )
+    .unwrap();
+    assert!(e.wake_waiting(109).unwrap().is_empty());
+    assert_eq!(e.wake_waiting(110).unwrap(), vec![task.id.clone()]);
+    assert!(
+        e.scheduler
+            .task(&task.id)
+            .unwrap()
+            .resume_note
+            .as_deref()
+            .unwrap()
+            .contains("срок")
+    );
+}

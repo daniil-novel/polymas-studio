@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D10 wait recovery: RED отсутствующие Engine park/wake_waiting. GREEN waiting сохраняется после reopen, чужой run не будит, подходящее сообщение будит ровно один раз, correlation удерживает ожидание до deadline, новая попытка сохраняет agentId и reason. Четыре engine tests и clippy. Runtime ещё не вызывает yield, поэтому автоматическое ожидание моделью не заявляется проверенным.
+
 D10h: RED отсутствовали WaitCondition/park/wake. GREEN waiting освобождает C=1 для другого агента, сохраняет идентичность, следующий lease новый; старое завершение/приёмка промежуточного результата/expired wait/turn exhausted/cancelled wake отклонены. Семь scheduler tests, engine tests и clippy. Пока состояние не вызывается реальным gateway, runtime wiring следует далее.
 
 D10g actual messaging smoke: run 8c2f9ad7-4fdb-435f-8090-36901a2eb532, Codex PID 10372 → 2756, C=1. Первый ответ SENT:POLYMAS-MESSAGE-83, второй RECEIVED:POLYMAS-MESSAGE-83; ровно по одному message.queued, delivered_to_context, acknowledged. Оба результата приняты после проверки событий. Никаких новых approval overrides для этого теста не вводилось. Computer use наблюдал второй работающий узел; короткий импульс ребра не зафиксирован на статическом кадре и отдельно не заявляется как визуально подтверждённый.

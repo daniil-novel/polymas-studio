@@ -73,6 +73,26 @@ fn save_message(conn: &rusqlite::Connection, message: &Message) -> Result<()> {
     Ok(())
 }
 impl Router {
+    pub fn pending_senders(
+        db: &Store,
+        run_id: &str,
+        recipient: &str,
+        condition: &crate::scheduler::WaitCondition,
+        timestamp: i64,
+    ) -> Result<Vec<String>> {
+        let mut query = db.connection().prepare("SELECT DISTINCT sender FROM messages WHERE run_id=?1 AND recipient=?2 AND state='queued' AND expires_at>?3 AND (?4 IS NULL OR sender=?4) AND (?5 IS NULL OR correlation_id=?5) LIMIT 5000")?;
+        let rows = query.query_map(
+            params![
+                run_id,
+                recipient,
+                timestamp,
+                condition.sender,
+                condition.correlation_id
+            ],
+            |r| r.get::<_, String>(0),
+        )?;
+        rows.map(|r| Ok(r?)).collect()
+    }
     pub fn get_for_recipient(
         db: &Store,
         run_id: &str,

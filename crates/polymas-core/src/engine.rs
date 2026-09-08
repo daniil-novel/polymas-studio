@@ -1,6 +1,6 @@
 use crate::error::{Error, Result, require};
 use crate::policy::Binding;
-use crate::scheduler::{Run, Scheduler, Task, TaskInput, TaskState};
+use crate::scheduler::{Run, Scheduler, Task, TaskInput, TaskState, WaitCondition};
 use crate::storage::EventInput;
 use crate::workspace::{ConfigCommand, Workspace};
 use serde_json::{Value, json};
@@ -13,6 +13,105 @@ pub struct Engine {
     pub scheduler: Scheduler,
 }
 impl Engine {
+    pub fn park(
+        &mut self,
+        task_id: &str,
+        epoch: u64,
+        condition: WaitCondition,
+        summary: String,
+        requested_at: i64,
+    ) -> Result<()> {
+        self.transition(|scheduler| {
+            scheduler.park(task_id, epoch, condition, summary, requested_at)
+        })
+    }
+    pub fn wake_waiting(&mut self, timestamp: i64) -> Result<Vec<String>> {
+        let mut decisions = vec![];
+        let live = &self.workspace.config().value;
+        let mut snapshots = std::collections::BTreeMap::new();
+        for task in self
+            .scheduler
+            .tasks
+            .iter()
+            .filter(|t| t.state == TaskState::Waiting)
+        {
+            let Some(condition) = &task.waiting else {
+                return Err(Error::Storage(
+                    "У ожидающей задачи отсутствует условие".into(),
+                ));
+            };
+            let run = self
+                .scheduler
+                .runs
+                .iter()
+                .find(|r| r.id == task.run_id)
+                .ok_or_else(|| Error::Storage("Запуск ожидания не найден".into()))?;
+            if run.stopped {
+                continue;
+            }
+            let reason = if timestamp >= condition.deadline_at {
+                Some(
+                    "Истёк срок ожидания сообщения. Сообщите об ограничении или примените правило эскалации роли.",
+                )
+            } else {
+                if let std::collections::btree_map::Entry::Vacant(entry) =
+                    snapshots.entry(run.config_revision)
+                {
+                    let saved = self
+                        .workspace
+                        .db
+                        .get::<crate::workspace::HistoryEntry>(
+                            "configuration_history",
+                            &run.config_revision.to_string(),
+                        )?
+                        .ok_or_else(|| Error::Storage("Снимок запуска недоступен".into()))?;
+                    entry.insert(saved.value.configuration);
+                }
+                let snapshot = &snapshots[&run.config_revision];
+                let senders = crate::messages::Router::pending_senders(
+                    &self.workspace.db,
+                    &task.run_id,
+                    &task.assignee,
+                    condition,
+                    timestamp,
+                )?;
+                senders.into_iter().any(|sender| {
+                    snapshot.registry.agent(&sender).is_ok_and(|a| a.status != crate::registry::AgentStatus::Archived)
+                        && live.registry.agent(&sender).is_ok_and(|a| a.status != crate::registry::AgentStatus::Archived)
+                        && snapshot.architecture.permits_message(&sender, &task.assignee)
+                        && live.architecture.permits_message(&sender, &task.assignee)
+                }).then_some("Получено подходящее сообщение. Обработайте входной batch с дедупликацией по messageId.")
+            };
+            if let Some(reason) = reason {
+                decisions.push((
+                    task.id.clone(),
+                    task.run_id.clone(),
+                    task.assignee.clone(),
+                    reason.to_owned(),
+                ));
+            }
+        }
+        if decisions.is_empty() {
+            return Ok(vec![]);
+        }
+        let mut candidate = self.scheduler.clone();
+        for (id, _, _, reason) in &decisions {
+            candidate.wake(id, reason.clone())?;
+        }
+        self.workspace.db.transaction(|tx| {
+            candidate.persist_delta(&self.scheduler, tx)?;
+            for (id, run_id, agent_id, reason) in &decisions {
+                tx.emit(
+                    EventInput::new("task.woken", json!({"taskId":id,"reason":reason}))
+                        .agent(agent_id)
+                        .run(run_id),
+                )?;
+            }
+            Ok(())
+        })?;
+        self.scheduler = candidate;
+        Ok(decisions.into_iter().map(|(id, _, _, _)| id).collect())
+    }
     pub fn open(root: &Path) -> Result<Self> {
         let mut workspace = Workspace::open(root)?;
         let before = Scheduler::load(&workspace.db)?;
