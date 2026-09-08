@@ -1,0 +1,58 @@
+.task-composer {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  font-size: 12px;
+}
+.run-list-heading {
+  margin-top: 28px;
+}
+.chat-modal {
+  padding: 28px;
+}
+.chat-close {
+  margin: 0 0 16px auto;
+}
+.composer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.composer-heading h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.target-controls {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(170px, 1.2fr);
+  gap: 12px;
+}
+.composer-review {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.task-composer > .primary {
+  align-self: flex-end;
+  min-width: 125px;
+}
+.task-composer details {
+  margin: 0;
+  padding-top: 12px;
+}
+.task-composer .checkbox-row {
+  margin: 0;
+}
+.task-composer.compact {
+  padding: 18px;
+  max-height: calc(100vh - 200px);
+  overflow: auto;
+}

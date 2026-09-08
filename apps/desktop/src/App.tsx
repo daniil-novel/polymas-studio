@@ -8,6 +8,7 @@ import {
   CircleHelp,
   Hexagon,
   Layers3,
+  MessageCircle,
   Network,
   Pause,
   Play,
@@ -25,6 +26,7 @@ import { useWorkspace } from './useWorkspace';
 import { RoleEditor } from './RoleEditor';
 import { ArchitectureEditor } from './ArchitectureEditor';
 import { Modal } from './Modal';
+import { TaskComposer } from './TaskComposer';
 import { agentState, stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
@@ -41,6 +43,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState('');
   const [architectureOpen, setArchitectureOpen] = useState(false);
+  const [chatAgentId, setChatAgentId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -300,6 +303,8 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                 {page === 'tasks' && (
                   <>
                     <h2>Задачи системы</h2>
+                    <TaskComposer snapshot={snapshot} command={data.command} />
+                    <h3 className="run-list-heading">Последние запуски</h3>
                     {snapshot.runs.length === 0 ? (
                       <p className="muted">Запуски появятся после отправки задачи.</p>
                     ) : (
@@ -402,6 +407,13 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                         <dd>Отдельный экземпляр</dd>
                       </dl>
                       <h3>Последние действия</h3>
+                      <button
+                        className="outline-primary wide"
+                        onClick={() => setChatAgentId(selected.id)}
+                      >
+                        <MessageCircle size={16} />
+                        Открыть диалог
+                      </button>
                       {events
                         .filter((e) => e.agentId === selected.id)
                         .slice(-6)
@@ -467,6 +479,28 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
           </>
         )}
       </main>
+      {snapshot && chatAgentId && (
+        <Modal label="Диалог с агентом" onClose={() => setChatAgentId(null)}>
+          <div className="chat-modal">
+            <button
+              className="icon-button chat-close"
+              aria-label="Закрыть диалог"
+              onClick={() => setChatAgentId(null)}
+            >
+              <X size={18} />
+            </button>
+            <TaskComposer
+              snapshot={snapshot}
+              command={data.command}
+              initialAgentId={chatAgentId}
+              onStarted={() => {
+                setChatAgentId(null);
+                setPage('tasks');
+              }}
+            />
+          </div>
+        </Modal>
+      )}
       {snapshot && architectureOpen && (
         <Modal
           label="Архитектура системы"
