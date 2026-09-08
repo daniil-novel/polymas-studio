@@ -23,6 +23,84 @@ fn input(key: &str) -> PublicationInput {
     }
 }
 
+#[test]
+fn graph_records_contradictions_and_bounds_causal_depth_without_losing_provenance() {
+    use polymas_core::{communication::PublicationLink, knowledge::Relation};
+    let mut db = Store::memory().unwrap();
+    let graph = ExchangeScope {
+        mode: CommunicationMode::Graph,
+        hop_limit: 1,
+        max_publications: 10,
+        ..scope("a")
+    };
+    let root = Publications::publish(&mut db, &graph, input("root")).unwrap();
+    let critique_input = PublicationInput {
+        links: vec![PublicationLink {
+            entry_id: root.id.clone(),
+            relation: Relation::Contradicts,
+        }],
+        ..input("critique")
+    };
+    let critic = ExchangeScope {
+        author: "b".into(),
+        ..graph.clone()
+    };
+    let critique = Publications::publish(&mut db, &critic, critique_input.clone()).unwrap();
+    assert_eq!(critique.depth, 1);
+    assert_eq!(critique.contributors, vec!["a", "b"]);
+    assert_eq!(critique.links[0].relation, Relation::Contradicts);
+    let continuation = PublicationInput {
+        links: vec![PublicationLink {
+            entry_id: critique.id.clone(),
+            relation: Relation::DerivedFrom,
+        }],
+        ..input("refine")
+    };
+    let before = db.last_sequence().unwrap();
+    assert!(Publications::publish(&mut db, &graph, continuation.clone()).is_err());
+    assert_eq!(db.last_sequence().unwrap(), before);
+    let larger = ExchangeScope {
+        hop_limit: 2,
+        ..graph.clone()
+    };
+    assert_eq!(
+        Publications::publish(&mut db, &larger, continuation)
+            .unwrap()
+            .depth,
+        2
+    );
+    let unrelated = ExchangeScope {
+        run_id: "another-run".into(),
+        ..critic.clone()
+    };
+    assert!(Publications::publish(&mut db, &unrelated, critique_input.clone()).is_err());
+    let private = ExchangeScope {
+        readable_authors: vec!["b".into()],
+        ..critic
+    };
+    assert!(Publications::publish(&mut db, &private, critique_input).is_err());
+    let nonexistent = PublicationInput {
+        links: vec![PublicationLink {
+            entry_id: "future-node".into(),
+            relation: Relation::Supports,
+        }],
+        ..input("future")
+    };
+    assert!(Publications::publish(&mut db, &graph, nonexistent).is_err());
+    assert_eq!(
+        Publications::page(
+            &db,
+            "run-one",
+            &PublicationQuery::default(),
+            Some(&["a".into()])
+        )
+        .unwrap()
+        .items
+        .len(),
+        1
+    );
+}
+
 fn wiki(author: &str) -> ExchangeScope {
     ExchangeScope {
         mode: CommunicationMode::Wiki,

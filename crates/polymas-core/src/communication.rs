@@ -9,6 +9,7 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
+mod graph;
 mod wiki;
 
 #[derive(Clone, Debug)]
@@ -23,6 +24,7 @@ pub struct ExchangeScope {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct PublicationInput {
+    pub links: Vec<PublicationLink>,
     pub key: String,
     pub title: String,
     pub body: String,
@@ -30,8 +32,18 @@ pub struct PublicationInput {
     pub expected_revision: u32,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PublicationLink {
+    pub entry_id: String,
+    pub relation: crate::knowledge::Relation,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Publication {
+    #[serde(default)]
+    pub links: Vec<PublicationLink>,
+    #[serde(default)]
+    pub depth: u32,
     pub id: String,
     pub run_id: String,
     pub mode: CommunicationMode,
@@ -102,7 +114,7 @@ impl Publications {
         require(
             matches!(
                 scope.mode,
-                CommunicationMode::Blackboard | CommunicationMode::Wiki
+                CommunicationMode::Blackboard | CommunicationMode::Wiki | CommunicationMode::Graph
             ),
             "Режим публикаций пока недоступен",
         )?;
@@ -119,6 +131,15 @@ impl Publications {
         bounded(&input.key, 128, "Ключ")?;
         bounded(&input.title, 200, "Заголовок")?;
         bounded(&input.body, 16384, "Markdown")?;
+        require(
+            (1..=32).contains(&scope.hop_limit),
+            "Некорректная глубина графа",
+        )?;
+        require(
+            input.links.len() <= 8
+                && (scope.mode == CommunicationMode::Graph || input.links.is_empty()),
+            "Связи доступны только графу, не более восьми",
+        )?;
         if scope.mode == CommunicationMode::Wiki {
             wiki::validate(&input)?;
         } else {
@@ -142,8 +163,9 @@ impl Publications {
             }
             let count: i64 = tx.connection().query_row("SELECT (SELECT COUNT(*) FROM entities WHERE collection='publications' AND json_extract(document,'$.runId')=?1) + (SELECT COUNT(*) FROM messages WHERE run_id=?1)", [&scope.run_id], |r| r.get(0))?;
             require(count < scope.max_publications as i64, "Исчерпан общий бюджет сообщений и публикаций")?;
-            let mut entry = Publication { id: id("publication"), run_id: scope.run_id.clone(), mode: scope.mode, author: scope.author.clone(), contributors: vec![scope.author.clone()], title: input.title.clone(), body: input.body.clone(), slug: input.slug.clone(), revision: 1, previous_id: None, created_at: now() };
+            let mut entry = Publication { id: id("publication"), run_id: scope.run_id.clone(), mode: scope.mode, author: scope.author.clone(), contributors: vec![scope.author.clone()], title: input.title.clone(), body: input.body.clone(), slug: input.slug.clone(), revision: 1, previous_id: None, links: input.links.clone(), depth: 0, created_at: now() };
             if scope.mode == CommunicationMode::Wiki { wiki::revise(tx, scope, &input, &mut entry)?; }
+            if scope.mode == CommunicationMode::Graph { graph::link(tx, scope, &mut entry)?; }
             tx.put("publications", &entry.id, 0, &entry)?;
             tx.put("publication_receipts", &receipt_key, 0, &Receipt { fingerprint, entry_id: entry.id.clone() })?;
             tx.emit(EventInput::new("communication.published", json!({"entryId":entry.id,"mode":entry.mode,"revision":entry.revision,"bytes":entry.body.len()})).agent(&scope.author).run(&scope.run_id))?;
