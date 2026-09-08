@@ -204,7 +204,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
           </div>
         ) : (
           <>
-            <div className="view-toolbar">
+            <div className="view-toolbar" hidden={page === 'agents'}>
               <div className="view-heading">
                 <span className="eyebrow">
                   {page === 'graph' ? 'ЖИВАЯ АРХИТЕКТУРА' : 'РАБОЧАЯ ОБЛАСТЬ'}
@@ -424,7 +424,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                 </aside>
               )}
             </div>
-            <section className="timeline">
+            <section className="timeline" hidden={page === 'agents'}>
               <div className="timeline-header">
                 <h3>Ход выполнения</h3>
                 <span className={`live-indicator ${connected ? '' : 'offline'}`}>

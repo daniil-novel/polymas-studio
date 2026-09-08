@@ -255,26 +255,26 @@ export function RoleEditor({ snapshot, command }: { snapshot: Snapshot; command:
                   placeholder="По умолчанию в Codex"
                 />
               </label>
-              <label>
-                Формат результата
-                <textarea
-                  rows={2}
-                  value={draft.outputContract}
-                  onChange={(e) => update('outputContract', e.target.value)}
-                />
-              </label>
-              <label>
-                Критерии приёмки
-                <textarea
-                  rows={2}
-                  value={draft.acceptanceCriteria}
-                  onChange={(e) => update('acceptanceCriteria', e.target.value)}
-                  placeholder="По каким признакам результат можно принять?"
-                />
-              </label>
               <details>
-                <summary>Дополнительные настройки роли</summary>
+                <summary>Формат результата, критерии и ограничения</summary>
                 <div className="advanced-fields">
+                  <label>
+                    Формат результата
+                    <textarea
+                      rows={2}
+                      value={draft.outputContract}
+                      onChange={(e) => update('outputContract', e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Критерии приёмки
+                    <textarea
+                      rows={2}
+                      value={draft.acceptanceCriteria}
+                      onChange={(e) => update('acceptanceCriteria', e.target.value)}
+                      placeholder="По каким признакам результат можно принять?"
+                    />
+                  </label>
                   <label>
                     Описание
                     <input
@@ -417,29 +417,34 @@ export function RoleEditor({ snapshot, command }: { snapshot: Snapshot; command:
                 </p>
               </div>
               <h4>Предпросмотр экземпляров</h4>
-              <div className="instance-preview">
-                {Array.from({ length: Math.min(4, Math.max(0, count)) }, (_, i) => (
-                  <div key={i}>
-                    <i className="dot idle" />
-                    <span>{formatName(pattern, i + 1)}</span>
-                    <small>Новый ID</small>
-                    <span className="badge">Готов к созданию</span>
+              <div className="preview-layout">
+                <div>
+                  <div className="instance-preview">
+                    {Array.from({ length: Math.min(4, Math.max(0, count)) }, (_, i) => (
+                      <div key={i}>
+                        <i className="dot idle" />
+                        <span>{formatName(pattern, i + 1)}</span>
+                        <small>Новый ID</small>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {count > 4 && <p className="small muted">+ ещё {(count - 4).toLocaleString('ru')}</p>}
-              <div className="independence-illustration" aria-hidden="true">
-                <div className="role-origin">
-                  <FileText size={14} />
-                  {draft.name || 'Роль'}
+                  {count > 4 && (
+                    <p className="small muted">+ ещё {(count - 4).toLocaleString('ru')}</p>
+                  )}
                 </div>
-                <div className="instance-branches">
-                  {[0, 1, 2, 3].slice(0, Math.min(4, count)).map((n) => (
-                    <span key={n}>
-                      <Users size={20} />
-                      <small>{String(n + 1).padStart(2, '0')}</small>
-                    </span>
-                  ))}
+                <div className="independence-illustration" aria-hidden="true">
+                  <div className="role-origin">
+                    <FileText size={14} />
+                    {draft.name || 'Роль'}
+                  </div>
+                  <div className="instance-branches">
+                    {[0, 1, 2, 3].slice(0, Math.min(4, count)).map((n) => (
+                      <span key={n}>
+                        <Users size={20} />
+                        <small>{String(n + 1).padStart(2, '0')}</small>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
               <p className="small muted">

@@ -213,9 +213,18 @@ summary {
   font-size: 9px;
 }
 .independence-illustration {
-  max-width: 300px;
-  margin: 30px auto;
+  width: 100%;
+  margin: 20px auto;
   color: var(--secondary);
+}
+.preview-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(160px, 1fr);
+  align-items: center;
+  gap: 24px;
+}
+.preview-layout small {
+  font-size: 12px;
 }
 .role-origin {
   border: 1px solid var(--border);
