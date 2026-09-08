@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D14d: RED отсутствующие CredentialVault/ServiceRecord. GREEN serialize/deserialize сохраняет reconnect после drop host, JSON не содержит credential, неверный workspaceId и отсутствующий vault credential отклонены. Три native_host tests с настоящим daemon и in-memory vault, clippy пройдены. Реальный OS vault в этом сценарии не подменяется утверждением о проверке: он будет проверен при запуске нативной оболочки.
+
 D14c: RED отсутствующий service module. GREEN launcher запускает настоящий daemon на port=0, изменение workspace сохраняется после shutdown/reopen, второй daemon на том же workspace отклонён, удаление handle не останавливает службу, явный HTTP shutdown завершает её. Два native_host tests с реальными процессами и clippy пройдены; модель в этих тестах не вызывается.
 
 D14b: RED отсутствующий NativeConnection. GREEN localhost POST с auth, запрет внешнего URL/gateway/path traversal/fragment, отказ redirects и ответа >16 МиБ, сохранение 409 и удаление credential из диагностик. Два native transport tests и clippy. Tauri window/launcher ещё не реализованы.

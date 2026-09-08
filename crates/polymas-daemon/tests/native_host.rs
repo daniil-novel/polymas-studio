@@ -1,5 +1,56 @@
 use polymas_desktop_host::service::RunningService;
 use serde_json::json;
+#[derive(Default)]
+struct MemoryVault(std::sync::Mutex<std::collections::BTreeMap<String, String>>);
+impl polymas_desktop_host::service::CredentialVault for MemoryVault {
+    fn save(&self, secret: &polymas_core::secrets::Secret) -> polymas_core::error::Result<String> {
+        let key = uuid::Uuid::new_v4().to_string();
+        self.0
+            .lock()
+            .unwrap()
+            .insert(key.clone(), secret.expose().into());
+        Ok(key)
+    }
+    fn load(&self, key: &str) -> polymas_core::error::Result<polymas_core::secrets::Secret> {
+        polymas_core::secrets::Secret::new(
+            self.0
+                .lock()
+                .unwrap()
+                .get(key)
+                .ok_or_else(|| polymas_core::error::Error::Denied("No credential".into()))?
+                .clone(),
+        )
+    }
+}
+#[tokio::test]
+async fn a_serialized_service_record_reconnects_without_storing_its_credential() {
+    let dir = tempfile::tempdir().unwrap();
+    let service = RunningService::launch(
+        std::path::Path::new(env!("CARGO_BIN_EXE_polymas-daemon")),
+        dir.path(),
+        1,
+    )
+    .await
+    .unwrap();
+    let vault = MemoryVault::default();
+    let record = service.remember(&vault).unwrap();
+    let text = serde_json::to_string(&record).unwrap();
+    for secret in vault.0.lock().unwrap().values() {
+        assert!(!text.contains(secret));
+    }
+    let restored: polymas_desktop_host::service::ServiceRecord =
+        serde_json::from_str(&text).unwrap();
+    drop(service);
+    let connection = restored.reconnect(&vault).await.unwrap();
+    let mut wrong = restored.clone();
+    wrong.workspace_id = "other-workspace".into();
+    assert!(wrong.reconnect(&vault).await.is_err());
+    assert!(restored.reconnect(&MemoryVault::default()).await.is_err());
+    connection
+        .request("/api/control", Some(json!({"action":"shutdown"})))
+        .await
+        .unwrap();
+}
 #[tokio::test]
 async fn native_launcher_owns_a_real_service_and_reopening_preserves_the_workspace() {
     let dir = tempfile::tempdir().unwrap();

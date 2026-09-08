@@ -4,7 +4,7 @@ use polymas_core::{
     process::{ProcessSpec, command_for},
     secrets::Secret,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{path::Path, process::Stdio, sync::Arc, time::Duration};
 use tokio::{
@@ -19,6 +19,50 @@ struct Ready {
     port: u16,
     workspace_id: String,
 }
+pub trait CredentialVault: Send + Sync {
+    fn save(&self, secret: &Secret) -> Result<String>;
+    fn load(&self, reference: &str) -> Result<Secret>;
+}
+impl CredentialVault for polymas_core::secrets::OsVault {
+    fn save(&self, secret: &Secret) -> Result<String> {
+        self.save(secret)
+    }
+    fn load(&self, reference: &str) -> Result<Secret> {
+        self.load(reference)
+    }
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ServiceRecord {
+    pub workspace_id: String,
+    pub port: u16,
+    pub pid: Option<u32>,
+    pub credential_ref: String,
+}
+impl ServiceRecord {
+    pub async fn reconnect(&self, vault: &dyn CredentialVault) -> Result<Arc<NativeConnection>> {
+        require(
+            !self.workspace_id.is_empty()
+                && self.workspace_id.len() <= 100
+                && !self.credential_ref.is_empty()
+                && self.credential_ref.len() <= 100,
+            "Некорректная запись службы",
+        )?;
+        let connection = Arc::new(NativeConnection::new(
+            self.port,
+            vault.load(&self.credential_ref)?,
+        )?);
+        let state = connection
+            .request("/api/state", None)
+            .await
+            .map_err(|e| Error::Runtime(e.message))?;
+        require(
+            state["config"]["value"]["id"].as_str() == Some(&self.workspace_id),
+            "На этом порту другая рабочая область; подключение отклонено",
+        )?;
+        Ok(connection)
+    }
+}
 /// The service is separate from the window. Drop deliberately detaches; only
 /// explicit shutdown requests stop work. Failed startup always reaps its child.
 pub struct RunningService {
@@ -27,6 +71,14 @@ pub struct RunningService {
     pub workspace_id: String,
 }
 impl RunningService {
+    pub fn remember(&self, vault: &dyn CredentialVault) -> Result<ServiceRecord> {
+        Ok(ServiceRecord {
+            workspace_id: self.workspace_id.clone(),
+            port: self.connection.port,
+            pid: self.child.id(),
+            credential_ref: vault.save(&self.connection.token)?,
+        })
+    }
     pub fn connection(&self) -> Arc<NativeConnection> {
         self.connection.clone()
     }
