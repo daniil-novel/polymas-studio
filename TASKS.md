@@ -66,6 +66,7 @@
   - [x] D19e. Scoped read-only knowledge gateway, отзыв памяти/bindings и provenance; публикация агентом, graph pulses и actual Codex smoke далее.
   - [x] D19f. Observable memory pulse в агентном графе по событиям чтения; actual provider/CU smoke далее.
   - [x] D19g. Actual Codex search + provenance read и приёмка fixture через UI; первый конфликт контракта сохранён как failed acceptance. Визуальный импульс/replay и внешний Neo4j остаются отдельными gate.
+  - [x] D19h. Read-only recording API: pinned configuration и ограниченные страницы событий до frozen cursor; UI replay далее.
 - [ ] D20. Масштабирование по правилам и ресурсные ограничения.
 - [ ] D21. Удалённые workers, enrollment, fencing и кластерный storage.
 - [ ] D22. Реальные Codex smoke/resume/concurrency и failure tests.

@@ -11,6 +11,7 @@ pub mod mcp_client;
 pub mod messages;
 pub mod policy;
 pub mod process;
+pub mod recording;
 pub mod registry;
 pub mod scheduler;
 pub mod secrets;
