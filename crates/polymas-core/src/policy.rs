@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
+mod requests;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
@@ -207,26 +208,7 @@ impl ApprovalLedger {
         timestamp: i64,
         ttl_seconds: i64,
     ) -> Result<Approval> {
-        require(
-            (1..=86400).contains(&ttl_seconds),
-            "Срок разрешения: 1–86400 секунд",
-        )?;
-        let approval = Approval {
-            id: id("approval"),
-            fingerprint: operation.fingerprint()?,
-            operation,
-            state: ApprovalState::Pending,
-            created_at: timestamp,
-            expires_at: timestamp
-                .checked_add(ttl_seconds)
-                .ok_or_else(|| Error::Validation("Некорректное время".into()))?,
-            decided_at: None,
-        };
-        db.transaction(|tx| {
-            tx.put("approvals", &approval.id, 0, &approval)?;
-            tx.emit(EventInput::new("approval.requested", json!({"approvalId": approval.id, "taskId": approval.operation.task_id, "tool": approval.operation.tool})).agent(&approval.operation.agent_id).run(&approval.operation.run_id))?;
-            Ok(approval)
-        })
+        db.transaction(|tx| requests::create(tx, operation, timestamp, ttl_seconds))
     }
     pub fn decide(db: &mut Store, id: &str, allow: bool, timestamp: i64) -> Result<Approval> {
         db.transaction(|tx| {

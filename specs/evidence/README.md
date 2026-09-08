@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D10m: RED отсутствующие request_for_attempt/for_attempt. GREEN пять policy tests: повтор после reopen возвращает прежний ID/expiry без события, другой payload/key отклонён, lookup разделяет task/epoch, denied retry не становится pending, новая попытка требует нового решения. Два binding tests и core clippy пройдены. Receipt и approval создаются одной SQLite transaction. Исполняющий gateway ещё не подключён.
+
 D10l: RED Operation не содержал run/namespace/resource scope hash. GREEN четыре policy tests: смена каждой области отклонена, старый unscoped Approval десериализуется, но approval/consume не проходит, неверный namespace/hash отклонён; lifecycle events относятся к run. Прежние exact args/epoch/expiry/single-use и два binding tests сохранены; core clippy пройден. Это ledger contract, внешние записи через gateway ещё закрыты.
 
 D16d: RED отсутствующий measured label renderer; дополнительный RED показал разрыв emoji при обрезании UTF-16. GREEN два regression: пересечение текста между разными grid cells исключено, независимая подпись остаётся, reset кадра снимает занятость, ширина ≤220 px и grapheme целы. Typecheck/lint пройдены. CU после полного reload (lazy renderer сохранялся при HMR) подтвердил отсутствие прежнего перекрытия подписей 03/05 и 01/04; имена/узлы не удалены из проекции. Это проверка 13 узлов, не performance gate для тысяч.

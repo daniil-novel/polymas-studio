@@ -17,6 +17,60 @@ fn operation() -> Operation {
     }
 }
 #[test]
+fn attempt_requests_retry_atomically_without_duplicates_or_extending_expiry() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("approvals.db");
+    let mut db = Store::open(&path).unwrap();
+    let first =
+        ApprovalLedger::request_for_attempt(&mut db, "request-1", operation(), 100, 30).unwrap();
+    let head = db.last_sequence().unwrap();
+    drop(db);
+    let mut db = Store::open(&path).unwrap();
+    let retried =
+        ApprovalLedger::request_for_attempt(&mut db, "request-1", operation(), 110, 60).unwrap();
+    assert_eq!(retried.id, first.id);
+    assert_eq!(retried.expires_at, 130);
+    assert_eq!(db.last_sequence().unwrap(), head);
+    let mut changed = operation();
+    changed.arguments["text"] = json!("other");
+    assert!(ApprovalLedger::request_for_attempt(&mut db, "request-1", changed, 111, 30).is_err());
+    assert!(
+        ApprovalLedger::request_for_attempt(&mut db, "request-2", operation(), 111, 30).is_err()
+    );
+    let lookup = ApprovalLedger::for_attempt(&db, "task-a", 7)
+        .unwrap()
+        .unwrap();
+    assert_eq!(lookup.id, first.id);
+    assert!(
+        ApprovalLedger::for_attempt(&db, "task-a", 8)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        ApprovalLedger::for_attempt(&db, "other-task", 7)
+            .unwrap()
+            .is_none()
+    );
+    ApprovalLedger::decide(&mut db, &first.id, false, 112).unwrap();
+    assert_eq!(
+        ApprovalLedger::request_for_attempt(&mut db, "request-1", operation(), 140, 60)
+            .unwrap()
+            .state,
+        ApprovalState::Denied
+    );
+    let mut fresh = operation();
+    fresh.epoch = 8;
+    let new = ApprovalLedger::request_for_attempt(&mut db, "request-1", fresh, 140, 60).unwrap();
+    assert_ne!(new.id, first.id);
+    assert_eq!(new.state, ApprovalState::Pending);
+    assert_eq!(
+        db.list::<polymas_core::policy::Approval>("approvals", 20)
+            .unwrap()
+            .len(),
+        2
+    );
+}
+#[test]
 fn approval_binds_run_namespace_and_resource_scope_and_legacy_unscoped_records_fail_closed() {
     let mut db = Store::memory().unwrap();
     let approval = ApprovalLedger::request(&mut db, operation(), 100, 300).unwrap();
