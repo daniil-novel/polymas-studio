@@ -14,5 +14,6 @@
 | D07b | `process` отсутствует; дополнительный RED: закрытые stdout/stderr отключали cancel, timeout 2 s | 4 tests с реальными Python child processes: разные PID, cancel, malformed JSON, closed-pipe cancellation | Контроль жизненного цикла, не доказательство hostile sandbox |
 | D07c | CodexStream отсутствует, E0432 | 6 contract tests; реальный Codex 0.144.1 / ChatGPT: PID 19872 → 24424, explicit session resume, контрольный маркер сохранён | Два коротких turn, без tool use; не 1000-concurrency и не sandbox certification |
 | D08 | `messages` отсутствует, E0432 | Повтор и restart без дубля; TTL; missing edge; hops; защита reply identity | Delivery API вызывается только после подтверждённой передачи контекста |
+| D09a | `connections` отсутствует, E0432 | Untested toggle, URL credentials/plain HTTP rejection, read-only file root and parent traversal | Файловый доступ через cap-std; внешние MCP проверяются следующим срезом |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.
