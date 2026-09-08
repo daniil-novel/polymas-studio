@@ -155,10 +155,8 @@ async fn prepare(state: &AppState, task: &Task) -> Result<(CodexRequest, Attempt
     } else {
         runtime.session_id
     };
-    let inbox = bounded_inbox(Router::pending_for_run(
-        &engine.workspace.db,
-        &task.run_id,
-        &task.assignee,
+    let inbox = bounded_inbox(engine.pending_context_messages(
+        &task.id,
         chrono::Utc::now().timestamp(),
         100,
     )?)?;

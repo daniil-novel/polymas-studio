@@ -7,7 +7,7 @@ use polymas_core::{
     error::{Error, Result, require},
     messages::{MessageInput, Router},
     registry::AgentStatus,
-    workspace::{Configuration, HistoryEntry},
+    workspace::Configuration,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -21,19 +21,7 @@ pub fn definitions() -> Vec<Value> {
     ]
 }
 fn pinned(engine: &Engine, scope: &Scope) -> Result<Configuration> {
-    let run = engine
-        .scheduler
-        .runs
-        .iter()
-        .find(|r| r.id == scope.run_id)
-        .ok_or_else(|| Error::NotFound("Запуск не найден".into()))?;
-    Ok(engine
-        .workspace
-        .db
-        .get::<HistoryEntry>("configuration_history", &run.config_revision.to_string())?
-        .ok_or_else(|| Error::Storage("Снимок архитектуры недоступен".into()))?
-        .value
-        .configuration)
+    engine.run_configuration(&scope.run_id)
 }
 fn permits(live: &Configuration, snapshot: &Configuration, from: &str, to: &str) -> bool {
     live.registry

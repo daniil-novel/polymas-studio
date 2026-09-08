@@ -13,6 +13,64 @@ pub struct Engine {
     pub scheduler: Scheduler,
 }
 impl Engine {
+    pub fn run_configuration(&self, run_id: &str) -> Result<crate::workspace::Configuration> {
+        let run = self
+            .scheduler
+            .runs
+            .iter()
+            .find(|r| r.id == run_id)
+            .ok_or_else(|| Error::NotFound("Запуск не найден".into()))?;
+        Ok(self
+            .workspace
+            .db
+            .get::<crate::workspace::HistoryEntry>(
+                "configuration_history",
+                &run.config_revision.to_string(),
+            )?
+            .ok_or_else(|| Error::Storage("Снимок запуска недоступен".into()))?
+            .value
+            .configuration)
+    }
+    pub fn pending_context_messages(
+        &self,
+        task_id: &str,
+        timestamp: i64,
+        limit: usize,
+    ) -> Result<Vec<crate::messages::Message>> {
+        let task = self.scheduler.task(task_id)?;
+        let snapshot = self.run_configuration(&task.run_id)?;
+        let live = &self.workspace.config().value;
+        let active = |config: &crate::workspace::Configuration, id: &str| {
+            config
+                .registry
+                .agent(id)
+                .is_ok_and(|a| a.status != crate::registry::AgentStatus::Archived)
+        };
+        require(
+            active(&snapshot, &task.assignee) && active(live, &task.assignee),
+            "Получатель недоступен",
+        )?;
+        let senders: Vec<_> = snapshot
+            .registry
+            .agents
+            .iter()
+            .filter(|a| {
+                active(&snapshot, &a.id)
+                    && active(live, &a.id)
+                    && snapshot.architecture.permits_message(&a.id, &task.assignee)
+                    && live.architecture.permits_message(&a.id, &task.assignee)
+            })
+            .map(|a| a.id.clone())
+            .collect();
+        crate::messages::Router::pending_authorized(
+            &self.workspace.db,
+            &task.run_id,
+            &task.assignee,
+            &senders,
+            timestamp,
+            limit,
+        )
+    }
     pub fn park(
         &mut self,
         task_id: &str,

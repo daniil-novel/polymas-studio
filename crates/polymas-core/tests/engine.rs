@@ -32,6 +32,104 @@ fn engine(path: &std::path::Path) -> Engine {
     e
 }
 #[test]
+fn revoked_senders_are_filtered_before_inbox_deserialization_and_batch_limit() {
+    use polymas_core::{
+        messages::{MessageInput, Router},
+        topology::Edge,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let mut e = engine(dir.path());
+    let role_id = e.workspace.config().value.registry.agents[0]
+        .role_id
+        .clone();
+    e.configure(
+        e.workspace.config().revision,
+        ConfigCommand::CreateAgents {
+            key: "third".into(),
+            request: BatchRequest {
+                role_id,
+                role_version: 1,
+                count: 1,
+                name_pattern: "Third".into(),
+            },
+        },
+    )
+    .unwrap();
+    let ids: Vec<_> = e
+        .workspace
+        .config()
+        .value
+        .registry
+        .agents
+        .iter()
+        .map(|a| a.id.clone())
+        .collect();
+    let mut architecture = e.workspace.config().value.architecture.clone();
+    architecture.edges = vec![
+        Edge {
+            from: ids[1].clone(),
+            to: ids[0].clone(),
+        },
+        Edge {
+            from: ids[2].clone(),
+            to: ids[0].clone(),
+        },
+    ];
+    e.configure(
+        e.workspace.config().revision,
+        ConfigCommand::SetArchitecture {
+            architecture: architecture.clone(),
+        },
+    )
+    .unwrap();
+    let run = e
+        .submit(
+            "inbox",
+            TaskInput {
+                prompt: "Receive allowed evidence".into(),
+                ..Default::default()
+            },
+            1,
+        )
+        .unwrap();
+    for n in 0..101 {
+        Router::send(
+            &mut e.workspace.db,
+            &architecture,
+            &run.id,
+            if n < 100 { &ids[1] } else { &ids[2] },
+            &n.to_string(),
+            MessageInput {
+                recipient: ids[0].clone(),
+                body: format!("Evidence {n}"),
+                ..Default::default()
+            },
+            100,
+        )
+        .unwrap();
+    }
+    architecture.edges.remove(0);
+    e.configure(
+        e.workspace.config().revision,
+        ConfigCommand::SetArchitecture { architecture },
+    )
+    .unwrap();
+    // Unauthorized content must not even be deserialized by the admission path.
+    rusqlite::Connection::open(dir.path().join("state.sqlite3"))
+        .unwrap()
+        .execute(
+            "UPDATE messages SET document='{}' WHERE sender=?1",
+            [&ids[1]],
+        )
+        .unwrap();
+    let messages = e
+        .pending_context_messages(&run.task_ids[0], 101, 100)
+        .unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender, ids[2]);
+    assert_eq!(messages[0].body, "Evidence 100");
+}
+#[test]
 fn durable_claim_becomes_unknown_after_restart_and_cannot_automatically_repeat() {
     let dir = tempfile::tempdir().unwrap();
     let mut e = engine(dir.path());

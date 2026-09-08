@@ -73,6 +73,31 @@ fn save_message(conn: &rusqlite::Connection, message: &Message) -> Result<()> {
     Ok(())
 }
 impl Router {
+    pub fn pending_authorized(
+        db: &Store,
+        run_id: &str,
+        recipient: &str,
+        senders: &[String],
+        timestamp: i64,
+        limit: usize,
+    ) -> Result<Vec<Message>> {
+        require(
+            (1..=100).contains(&limit) && senders.len() <= 5000,
+            "Некорректные ограничения inbox",
+        )?;
+        let mut query = db.connection().prepare("SELECT document FROM messages WHERE run_id=?1 AND recipient=?2 AND state='queued' AND expires_at>?3 AND sender IN (SELECT value FROM json_each(?4)) ORDER BY rowid LIMIT ?5")?;
+        let rows = query.query_map(
+            params![
+                run_id,
+                recipient,
+                timestamp,
+                serde_json::to_string(senders)?,
+                limit as i64
+            ],
+            |r| r.get::<_, String>(0),
+        )?;
+        rows.map(|r| Ok(serde_json::from_str(&r?)?)).collect()
+    }
     pub fn pending_senders(
         db: &Store,
         run_id: &str,
