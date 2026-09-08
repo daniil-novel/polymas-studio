@@ -20,6 +20,7 @@ rmcp = { version = "3.2.0", default-features = false, features = ["server", "tra
 tower-http = { version = "0.6", features = ["fs", "compression-gzip", "set-header"] }
 
 [dev-dependencies]
+polymas-desktop-host = { path = "../polymas-desktop-host" }
 tempfile.workspace = true
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

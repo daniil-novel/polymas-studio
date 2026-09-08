@@ -1,4 +1,5 @@
 //! Native desktop boundary. Webviews never receive the daemon credential.
+pub mod service;
 use polymas_core::{
     error::{Result, require},
     secrets::Secret,

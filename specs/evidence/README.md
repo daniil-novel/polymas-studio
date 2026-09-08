@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D14c: RED отсутствующий service module. GREEN launcher запускает настоящий daemon на port=0, изменение workspace сохраняется после shutdown/reopen, второй daemon на том же workspace отклонён, удаление handle не останавливает службу, явный HTTP shutdown завершает её. Два native_host tests с реальными процессами и clippy пройдены; модель в этих тестах не вызывается.
+
 D14b: RED отсутствующий NativeConnection. GREEN localhost POST с auth, запрет внешнего URL/gateway/path traversal/fragment, отказ redirects и ответа >16 МиБ, сохранение 409 и удаление credential из диагностик. Два native transport tests и clippy. Tauri window/launcher ещё не реализованы.
 
 Actual deadline после context fix: task_4e4d9080-bd92-4b7e-8b84-4965bbfe0893, PID 23176 → waiting → PID 27112, одинаковая sessionId; одно task.woken в 04:34:43 UTC при deadline 04:34:43. Ответ DEADLINE-VERIFIED-28, attempt=2, accepted подтверждён API после приёмки через UI. Скриншот реальной wait-панели проверен перед пробуждением. Первое неуспешное испытание сохранено как rejected/stopped, не засчитано.
