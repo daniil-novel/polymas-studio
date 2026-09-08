@@ -1,16 +1,8 @@
 import { useMemo, useState } from 'react';
-import {
-  Check,
-  ChevronRight,
-  Copy,
-  FileText,
-  Plus,
-  Save,
-  Shield,
-  Terminal,
-  Users,
-} from 'lucide-react';
+import { Check, ChevronRight, FileText, Plus, Save, Shield, Terminal, Users } from 'lucide-react';
 import type { Role, RoleDraft, Snapshot } from './types';
+import type { GraphNode } from './graph/model';
+import { AgentDirectory } from './AgentDirectory';
 import './roles.css';
 export type Command = (path: string, body: unknown) => Promise<unknown>;
 const blank: RoleDraft = {
@@ -31,7 +23,15 @@ function formatName(pattern: string, n: number) {
     String(n).padStart(Number(width ?? 0), '0'),
   );
 }
-export function RoleEditor({ snapshot, command }: { snapshot: Snapshot; command: Command }) {
+export function RoleEditor({
+  snapshot,
+  command,
+  nodes = [],
+}: {
+  snapshot: Snapshot;
+  command: Command;
+  nodes?: GraphNode[];
+}) {
   const [roleId, setRoleId] = useState('');
   const [baseVersion, setBaseVersion] = useState(0);
   const [draft, setDraft] = useState<RoleDraft>({ ...blank });
@@ -172,7 +172,7 @@ export function RoleEditor({ snapshot, command }: { snapshot: Snapshot; command:
           value={roleId}
           onChange={(e) => (dirty ? setPendingRole(e.target.value) : choose(e.target.value))}
         >
-          <option value="">Новая роль</option>
+          <option value="">{tab === 'instances' ? 'Все роли' : 'Новая роль'}</option>
           {latest.map((r) => (
             <option value={r.id} key={r.id}>
               {r.name} · v{r.version}
@@ -476,31 +476,7 @@ export function RoleEditor({ snapshot, command }: { snapshot: Snapshot; command:
           </footer>
         </>
       ) : (
-        <div className="instance-table">
-          <div className="table-head">
-            <span>Экземпляр</span>
-            <span>Версия роли</span>
-            <span>Идентификатор</span>
-            <span>Действия</span>
-          </div>
-          {owned.map((a) => (
-            <div className="table-row" key={a.id}>
-              <span>
-                <i className="dot idle" />
-                {a.name}
-              </span>
-              <span>v{a.roleVersion}</span>
-              <code>{a.id.slice(-12)}</code>
-              <button
-                className="icon-button"
-                aria-label={`Скопировать ID ${a.name}`}
-                onClick={() => void navigator.clipboard.writeText(a.id)}
-              >
-                <Copy size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
+        <AgentDirectory snapshot={snapshot} roleId={roleId} nodes={nodes} />
       )}
       {pendingRole !== null && (
         <div className="dialog-backdrop">

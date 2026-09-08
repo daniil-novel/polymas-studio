@@ -1,0 +1,105 @@
+.agent-directory {
+  min-width: 0;
+}
+.instance-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(170px, 0.65fr) minmax(175px, 0.65fr);
+  gap: 12px;
+  margin: 18px 0;
+}
+.instance-filters label {
+  font-size: 12px;
+  min-width: 0;
+}
+.instance-summary,
+.instance-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  padding: 10px 0;
+}
+.instance-viewport {
+  max-width: 100%;
+  height: min(540px, 60vh);
+  min-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.instance-directory-table {
+  table-layout: fixed;
+  width: 1445px;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+  font-size: 12px;
+}
+.instance-directory-table th {
+  height: 36px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.instance-directory-table td,
+.instance-directory-table th {
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.instance-directory-table td {
+  height: 60px;
+}
+.instance-directory-table tbody tr:not(.instance-spacer):hover {
+  background: #ffffff04;
+}
+.instance-directory-table td small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  font-size: 10px;
+}
+.instance-directory-table code {
+  font-size: 11px;
+}
+.instance-directory-table .instance-spacer td {
+  padding: 0;
+  border: 0;
+}
+.instance-name .dot {
+  margin-right: 9px;
+}
+.instance-pager {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.instance-pager button {
+  font-size: 12px;
+}
+@media (max-width: 1000px) {
+  .instance-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+  .instance-filters label:first-child {
+    grid-column: 1 / -1;
+  }
+  .instance-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+}
+@media (max-width: 620px) {
+  .instance-filters {
+    grid-template-columns: 1fr;
+  }
+}

@@ -402,7 +402,11 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                   </>
                 )}
                 <div hidden={page !== 'agents'}>
-                  <RoleEditor snapshot={snapshot} command={data.command} />
+                  <RoleEditor
+                    snapshot={snapshot}
+                    command={data.command}
+                    nodes={projection?.nodes ?? []}
+                  />
                 </div>
                 <div hidden={page !== 'mcp'}>
                   <McpWorkspace snapshot={snapshot} command={data.command} />
