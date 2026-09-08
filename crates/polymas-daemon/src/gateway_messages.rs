@@ -84,6 +84,12 @@ pub async fn dispatch(
 ) -> Result<Value> {
     let mut engine = state.engine.lock().await;
     validate(&engine, scope)?;
+    let exchange = engine.communication_scope(&scope.run_id, &scope.agent_id)?;
+    require(
+        name == "polymas_list_peers"
+            || exchange.mode == polymas_core::topology::CommunicationMode::Direct,
+        "Этот запуск использует публикации; адресный inbox выключен",
+    )?;
     let timestamp = chrono::Utc::now().timestamp();
     let result = match name {
         "polymas_list_peers" => {

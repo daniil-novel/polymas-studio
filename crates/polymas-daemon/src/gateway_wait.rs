@@ -34,6 +34,13 @@ pub fn definition() -> Value {
 pub async fn request(state: &AppState, scope: &Scope, input: WaitInput) -> Result<Value> {
     let mut engine = state.engine.lock().await;
     validate(&engine, scope)?;
+    require(
+        engine
+            .communication_scope(&scope.run_id, &scope.agent_id)?
+            .mode
+            == polymas_core::topology::CommunicationMode::Direct,
+        "Ожидание адресного сообщения недоступно в режиме публикаций",
+    )?;
     crate::gateway_operations::require_previous_resolved(&engine, scope)?;
     require(
         polymas_core::policy::ApprovalLedger::for_attempt(

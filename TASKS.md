@@ -12,6 +12,7 @@
     - [x] D26b3. Markdown-вики: immutable версии, latest/history, CAS двух писателей и наследование доступа всех участников.
     - [x] D26b4. Граф утверждений: supports/contradicts/derived_from, предел глубины, запрет чужих/будущих ссылок и наследование provenance.
   - [ ] D26c. Gateway инструменты, owner просмотр и сопоставление запусков.
+    - [x] D26c1. Attempt-scoped publish/read, live∩pinned доступ и режим, trusted runtime mode, журнал чтений без содержимого.
   - [ ] D26d. Выбор режима, экран истории/сравнения, regression и CU.
   - [ ] D26e. Actual Codex smoke новых режимов и сопоставимая серия с качеством/usage; внешний GraphDB и масштаб отдельно.
 

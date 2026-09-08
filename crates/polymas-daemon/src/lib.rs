@@ -8,6 +8,7 @@ pub mod gateway;
 pub mod gateway_knowledge;
 pub mod gateway_messages;
 pub mod gateway_operations;
+pub mod gateway_publications;
 pub mod gateway_tools;
 pub mod gateway_wait;
 pub mod knowledge_api;

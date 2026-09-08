@@ -28,6 +28,10 @@ pub fn definitions() -> Value {
     value["tools"]
         .as_array_mut()
         .expect("static tools array")
+        .extend(crate::gateway_publications::definitions());
+    value["tools"]
+        .as_array_mut()
+        .expect("static tools array")
         .push(crate::gateway_wait::definition());
     value["tools"]
         .as_array_mut()
@@ -75,6 +79,11 @@ async fn dispatch(state: &AppState, scope: &Scope, input: ToolCall) -> Result<Va
         .try_acquire()
         .map_err(|_| Error::Capacity("Дождитесь завершения текущего вызова инструмента".into()))?;
     match input.name.as_str() {
+        "polymas_publish" | "polymas_read_publications" => {
+            crate::gateway_publications::dispatch(state, scope, &input.name, input.arguments)
+                .await
+                .map(success)
+        }
         "polymas_request_operation"
         | "polymas_operation_status"
         | "polymas_execute_operation"

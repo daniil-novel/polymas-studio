@@ -6,6 +6,7 @@ use crate::workspace::{ConfigCommand, Workspace};
 use serde_json::{Value, json};
 use std::path::Path;
 mod approvals;
+mod communication;
 pub use approvals::OperationRequest;
 
 /// Synchronous transactional application layer. The daemon owns one Engine
@@ -42,6 +43,11 @@ impl Engine {
         let task = self.scheduler.task(task_id)?;
         let snapshot = self.run_configuration(&task.run_id)?;
         let live = &self.workspace.config().value;
+        if snapshot.architecture.communication_mode != crate::topology::CommunicationMode::Direct
+            || live.architecture.communication_mode != crate::topology::CommunicationMode::Direct
+        {
+            return Ok(vec![]);
+        }
         let active = |config: &crate::workspace::Configuration, id: &str| {
             config
                 .registry
