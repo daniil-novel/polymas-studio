@@ -374,13 +374,56 @@ fn safe_value(value: &Value) -> Value {
     }
 }
 
+/// Observable progress is separate from tool data and private model reasoning.
+pub fn observable_event(source: &Value) -> Option<crate::process::ProcessEvent> {
+    if source["item"]["type"] == "reasoning" {
+        return None;
+    }
+    let kind = match source["type"].as_str().unwrap_or("unknown") {
+        "thread.started" => "runtime.session",
+        "turn.started" => "runtime.turn_started",
+        "turn.completed" => "runtime.turn_completed",
+        "turn.failed" | "error" => "runtime.error",
+        "item.started" => "runtime.item_started",
+        "item.completed" => "runtime.item_completed",
+        "item.updated" => "runtime.item_updated",
+        _ => "runtime.unknown_event",
+    };
+    let body = if source["item"]["type"] == "mcp_tool_call" {
+        let item = &source["item"];
+        let mut summary = serde_json::Map::new();
+        for field in ["id", "type", "server", "tool", "status"] {
+            if let Some(value) = item[field].as_str() {
+                summary.insert(
+                    field.into(),
+                    Value::String(crate::process::redact(
+                        &value.chars().take(200).collect::<String>(),
+                    )),
+                );
+            }
+        }
+        summary.insert("hasResult".into(), Value::Bool(!item["result"].is_null()));
+        summary.insert(
+            "hasError".into(),
+            Value::Bool(!item["error"].is_null() || item["result"]["isError"] == true),
+        );
+        serde_json::json!({"type":source["type"],"item":summary})
+    } else {
+        safe_value(source)
+    };
+    Some(crate::process::ProcessEvent {
+        kind: kind.into(),
+        body,
+    })
+}
+
 pub async fn run_codex(
     executable: PathBuf,
     request: CodexRequest,
     sender: tokio::sync::mpsc::Sender<crate::process::ProcessEvent>,
     cancel: tokio::sync::watch::Receiver<bool>,
 ) -> Result<CodexResult> {
-    use crate::process::{ProcessEvent, ProcessSpec, run_process};
+    use crate::process::{ProcessSpec, run_process};
     let args = build_arguments(&request)?;
     let mut stream = CodexStream::new(request.session_id.clone());
     let (raw_sender, mut receiver) = tokio::sync::mpsc::channel(128);
@@ -403,24 +446,10 @@ pub async fn run_codex(
                 let _ = handle.await;
                 return Err(error);
             }
-            let source_type = event.body["type"].as_str().unwrap_or("unknown");
-            if event.body["item"]["type"] == "reasoning" {
+            let Some(observed) = observable_event(&event.body) else {
                 continue;
-            }
-            let kind = match source_type {
-                "thread.started" => "runtime.session",
-                "turn.started" => "runtime.turn_started",
-                "turn.completed" => "runtime.turn_completed",
-                "turn.failed" | "error" => "runtime.error",
-                "item.started" => "runtime.item_started",
-                "item.completed" => "runtime.item_completed",
-                "item.updated" => "runtime.item_updated",
-                _ => "runtime.unknown_event",
             };
-            ProcessEvent {
-                kind: kind.into(),
-                body: safe_value(&event.body),
-            }
+            observed
         } else {
             event
         };

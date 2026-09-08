@@ -81,3 +81,15 @@ fn cross_agent_session_substitution_is_rejected() {
             .is_err()
     );
 }
+#[test]
+fn mcp_observation_records_activity_without_copying_arguments_or_source_results() {
+    let raw = serde_json::json!({"type":"item.completed","item":{"id":"item_8","type":"mcp_tool_call","server":"polymas","tool":"polymas_read_source","status":"completed","arguments":{"query":"PRIVATE-ARGUMENT"},"result":{"content":[{"type":"text","text":"PRIVATE-SOURCE"}]},"error":{"message":"PRIVATE-ERROR"}}});
+    let event = polymas_core::codex::observable_event(&raw).unwrap();
+    assert_eq!(event.kind, "runtime.item_completed");
+    assert_eq!(event.body["item"]["tool"], "polymas_read_source");
+    assert_eq!(event.body["item"]["status"], "completed");
+    assert!(!event.body.to_string().contains("PRIVATE-"));
+    assert!(polymas_core::codex::observable_event(&serde_json::json!({"type":"item.completed","item":{"type":"reasoning","text":"hidden reasoning"}})).is_none());
+    let visible = polymas_core::codex::observable_event(&serde_json::json!({"type":"item.completed","item":{"type":"agent_message","text":"Visible progress"}})).unwrap();
+    assert_eq!(visible.body["item"]["text"], "Visible progress");
+}

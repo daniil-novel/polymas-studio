@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D10 runtime event review: RED отсутствовала отдельная observable projection. GREEN MCP arguments/result/error content не копируются в event, имя/status сохранены, reasoning исключён, обычный progress видим. Семь codex contract tests и clippy. Это защита новых событий; провайдер может хранить собственную сессию отдельно от PolyMAS.
+
 D10 actual Codex finding: PID 24540 обнаружил файловый источник, но Codex отклонил polymas_call_source до gateway как потенциальную запись (`user cancelled MCP tool call`). Это не успешный read smoke. RED нового regression показал отсутствие отдельного read interface. GREEN polymas_read_source объявлен read-only и отклоняет разрешённый write tool до call_started; пять gateway tests и clippy. Политика approval/sandbox не ослаблялась. [Codex MCP approval modes](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) проверены 2026-09-08.
 
 D10 source credential review: RED отсутствовал sanitizer успешного MCP результата. GREEN вложенные content/structuredContent и ключи очищены от точных значений bearer/env secrets, обычный текст сохранён; два connection tests и clippy. Это защита от прямого echo, не обещание обнаружения произвольного кодирования секрета внешним сервером.
