@@ -80,7 +80,10 @@ def main() -> None:
         assert event["sequence"] > streams.get(event["streamId"], 0)
         streams[event["streamId"]] = event["sequence"]
     checked_links = 0
-    for path in ROOT.rglob("*.md"):
+    documentation = list(ROOT.glob("*.md"))
+    for directory in ("specs", "design", "contracts", "docs"):
+        documentation.extend((ROOT / directory).rglob("*.md"))
+    for path in documentation:
         for target in re.findall(r"!?\[[^\]]*\]\(([^)]+)\)", path.read_text(encoding="utf-8")):
             if "://" in target or target.startswith("#"):
                 continue

@@ -1630,4 +1630,3 @@ sequence монотонен внутри streamId. Event ID уникален. ca
 ## Проверка текущего пакета
 
 scripts/validate_spec.py проверяет schema validity, примеры, смысловые инварианты blueprint и локальные ссылки документов. Нужен Python 3.11+ с jsonschema. Эта проверка не запускает Codex, MCP или сетевые обращения.
-
