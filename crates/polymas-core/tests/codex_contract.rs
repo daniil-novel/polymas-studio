@@ -1,5 +1,6 @@
-use polymas_core::codex::{CodexRequest, JsonlDecoder, build_arguments};
+use polymas_core::codex::{CodexRequest, CodexStream, JsonlDecoder, build_arguments};
 use polymas_core::registry::Sandbox;
+use serde_json::json;
 
 fn request(session: Option<String>) -> CodexRequest {
     CodexRequest {
@@ -53,4 +54,30 @@ fn malformed_or_oversized_stream_never_becomes_success() {
     let mut decoder = JsonlDecoder::default();
     decoder.push(b"{\"type\":").unwrap();
     assert!(decoder.finish().is_err());
+}
+
+#[test]
+fn final_text_without_turn_completed_is_not_a_successful_turn() {
+    let mut stream = CodexStream::new(None);
+    stream
+        .observe(
+            &json!({"type":"thread.started","thread_id":"0199a213-81c0-7800-8aa1-bbab2a035a53"}),
+        )
+        .unwrap();
+    stream
+        .observe(&json!({"type":"item.completed","item":{"type":"agent_message","text":"done"}}))
+        .unwrap();
+    assert!(stream.finish().is_err());
+}
+
+#[test]
+fn cross_agent_session_substitution_is_rejected() {
+    let mut stream = CodexStream::new(Some("0199a213-81c0-7800-8aa1-bbab2a035a53".into()));
+    assert!(
+        stream
+            .observe(
+                &json!({"type":"thread.started","thread_id":"0199a213-81c0-7800-8aa1-bbab2a035a54"})
+            )
+            .is_err()
+    );
 }

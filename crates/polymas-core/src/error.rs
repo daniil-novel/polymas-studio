@@ -17,6 +17,10 @@ pub enum Error {
     Storage(String),
     #[error("{0}")]
     Runtime(String),
+    #[error("{0}")]
+    Cancelled(String),
+    #[error("{0}")]
+    Timeout(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

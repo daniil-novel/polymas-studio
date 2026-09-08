@@ -16,6 +16,7 @@ pub struct CodexRequest {
     pub prompt: String,
     pub gateway: Option<McpLaunch>,
     pub timeout_seconds: u64,
+    pub environment: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug)]
@@ -217,4 +218,239 @@ pub fn resolve_codex(explicit: Option<&std::path::Path>) -> Result<PathBuf> {
     Err(Error::Runtime(
         "Codex CLI не найден. Установите его и укажите путь к бинарнику в настройках.".into(),
     ))
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexResult {
+    pub session_id: String,
+    pub output: String,
+    pub usage: Option<Value>,
+    pub pid: u32,
+}
+
+pub struct CodexStream {
+    expected_session: Option<String>,
+    session: Option<String>,
+    output: String,
+    usage: Option<Value>,
+    completed: bool,
+    failed: bool,
+}
+impl CodexStream {
+    pub fn new(expected_session: Option<String>) -> Self {
+        Self {
+            expected_session,
+            session: None,
+            output: String::new(),
+            usage: None,
+            completed: false,
+            failed: false,
+        }
+    }
+    pub fn observe(&mut self, event: &Value) -> Result<()> {
+        match event["type"].as_str().unwrap_or("") {
+            "thread.started" => {
+                let session = event["thread_id"]
+                    .as_str()
+                    .ok_or_else(|| Error::Runtime("Codex не вернул session ID".into()))?;
+                uuid::Uuid::parse_str(session)
+                    .map_err(|_| Error::Runtime("Codex вернул некорректный session UUID".into()))?;
+                if self
+                    .expected_session
+                    .as_ref()
+                    .is_some_and(|id| id != session)
+                    || self.session.as_ref().is_some_and(|id| id != session)
+                {
+                    return Err(Error::Denied(
+                        "Codex вернул другую сессию; попытка прервана".into(),
+                    ));
+                }
+                self.session = Some(session.into());
+            }
+            "item.completed" if event["item"]["type"] == "agent_message" => {
+                self.output = event["item"]["text"].as_str().unwrap_or_default().into();
+            }
+            "turn.completed" => {
+                self.completed = true;
+                self.usage = event.get("usage").filter(|v| v.is_object()).cloned();
+            }
+            "turn.failed" => self.failed = true,
+            _ => {}
+        }
+        Ok(())
+    }
+    pub fn finish(self) -> Result<CodexResult> {
+        require(
+            self.completed && !self.failed && !self.output.trim().is_empty(),
+            "Codex не подтвердил завершение turn с результатом",
+        )?;
+        Ok(CodexResult {
+            session_id: self
+                .session
+                .ok_or_else(|| Error::Runtime("Нет подтверждённой сессии".into()))?,
+            output: self.output,
+            usage: self.usage,
+            pid: 0,
+        })
+    }
+}
+
+pub async fn probe_codex(explicit: Option<&std::path::Path>) -> Result<RuntimeProbe> {
+    use std::time::Duration;
+    let path = resolve_codex(explicit)?;
+    async fn output(path: &std::path::Path, args: &[&str]) -> Result<(bool, String)> {
+        let mut command = tokio::process::Command::new(path);
+        command
+            .args(args)
+            .kill_on_drop(true)
+            .stdin(std::process::Stdio::null());
+        #[cfg(windows)]
+        command.creation_flags(0x08000000);
+        let output = tokio::time::timeout(Duration::from_secs(10), command.output())
+            .await
+            .map_err(|_| Error::Timeout("Codex не ответил на проверку за 10 секунд".into()))??;
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok((output.status.success(), crate::process::redact(&text)))
+    }
+    let (ok, version_text) = output(&path, &["--version"]).await?;
+    require(
+        ok && version_text.starts_with("codex-cli "),
+        "Файл не является поддерживаемым Codex CLI",
+    )?;
+    let version = version_text
+        .trim()
+        .trim_start_matches("codex-cli ")
+        .to_string();
+    let (authenticated, auth) = output(&path, &["login", "status"]).await?;
+    Ok(RuntimeProbe {
+        path,
+        compatible: version == SUPPORTED_CODEX_VERSION,
+        version,
+        authenticated,
+        auth_method: if auth.contains("ChatGPT") {
+            "chatgpt"
+        } else if authenticated {
+            "api_key"
+        } else {
+            "none"
+        }
+        .into(),
+    })
+}
+
+fn safe_value(value: &Value) -> Value {
+    match value {
+        Value::String(text) => Value::String(crate::process::redact(text)),
+        Value::Array(items) => Value::Array(items.iter().map(safe_value).collect()),
+        Value::Object(object) => Value::Object(
+            object
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        if [
+                            "access_token",
+                            "refresh_token",
+                            "api_key",
+                            "password",
+                            "authorization",
+                        ]
+                        .contains(&k.to_lowercase().as_str())
+                        {
+                            Value::String("[REDACTED]".into())
+                        } else {
+                            safe_value(v)
+                        },
+                    )
+                })
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
+pub async fn run_codex(
+    executable: PathBuf,
+    request: CodexRequest,
+    sender: tokio::sync::mpsc::Sender<crate::process::ProcessEvent>,
+    cancel: tokio::sync::watch::Receiver<bool>,
+) -> Result<CodexResult> {
+    use crate::process::{ProcessEvent, ProcessSpec, run_process};
+    let args = build_arguments(&request)?;
+    let mut stream = CodexStream::new(request.session_id.clone());
+    let (raw_sender, mut receiver) = tokio::sync::mpsc::channel(128);
+    let handle = tokio::spawn(run_process(
+        ProcessSpec {
+            executable,
+            args,
+            workspace: request.workspace,
+            stdin: request.prompt,
+            timeout_seconds: request.timeout_seconds.max(1),
+            environment: request.environment,
+        },
+        raw_sender,
+        cancel,
+    ));
+    while let Some(event) = receiver.recv().await {
+        let event = if event.kind == "runtime.event" {
+            if let Err(error) = stream.observe(&event.body) {
+                handle.abort();
+                let _ = handle.await;
+                return Err(error);
+            }
+            let source_type = event.body["type"].as_str().unwrap_or("unknown");
+            if event.body["item"]["type"] == "reasoning" {
+                continue;
+            }
+            let kind = match source_type {
+                "thread.started" => "runtime.session",
+                "turn.started" => "runtime.turn_started",
+                "turn.completed" => "runtime.turn_completed",
+                "turn.failed" | "error" => "runtime.error",
+                "item.started" => "runtime.item_started",
+                "item.completed" => "runtime.item_completed",
+                "item.updated" => "runtime.item_updated",
+                _ => "runtime.unknown_event",
+            };
+            ProcessEvent {
+                kind: kind.into(),
+                body: safe_value(&event.body),
+            }
+        } else {
+            event
+        };
+        if !matches!(
+            tokio::time::timeout(std::time::Duration::from_secs(5), sender.send(event)).await,
+            Ok(Ok(()))
+        ) {
+            handle.abort();
+            let _ = handle.await;
+            return Err(Error::Runtime("Журнал не принял события Codex".into()));
+        }
+    }
+    let outcome = handle
+        .await
+        .map_err(|e| Error::Runtime(format!("Supervisor завершился: {e}")))??;
+    if outcome.cancelled {
+        return Err(Error::Cancelled(
+            "Codex остановлен; возможные внешние действия требуют проверки".into(),
+        ));
+    }
+    if outcome.timed_out {
+        return Err(Error::Timeout("Превышено время выполнения Codex".into()));
+    }
+    if !outcome.success {
+        return Err(Error::Runtime(format!(
+            "Codex завершился с кодом {:?}: {}",
+            outcome.exit_code, outcome.stderr_tail
+        )));
+    }
+    let mut result = stream.finish()?;
+    result.pid = outcome.pid;
+    Ok(result)
 }

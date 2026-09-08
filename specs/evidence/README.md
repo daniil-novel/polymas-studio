@@ -12,5 +12,6 @@
 | D06 | `cargo test --test scheduler`: scheduler отсутствует, E0432 | N=1000/C=10; reject start-all при 10 slots; stale fence; acceptance/quorum; crash=unknown; no concurrent turns | Lease tests не заменяют OS process test |
 | D07a | `cargo test --test codex_contract`: codex отсутствует, E0432 | Аргументы без shell/prompt interpolation; exact resume; UTF-8 chunks; malformed/oversize rejection | Реальный process следующий срез |
 | D07b | `process` отсутствует; дополнительный RED: закрытые stdout/stderr отключали cancel, timeout 2 s | 4 tests с реальными Python child processes: разные PID, cancel, malformed JSON, closed-pipe cancellation | Контроль жизненного цикла, не доказательство hostile sandbox |
+| D07c | CodexStream отсутствует, E0432 | 6 contract tests; реальный Codex 0.144.1 / ChatGPT: PID 19872 → 24424, explicit session resume, контрольный маркер сохранён | Два коротких turn, без tool use; не 1000-concurrency и не sandbox certification |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.
