@@ -111,6 +111,7 @@ impl Store {
                 document TEXT NOT NULL CHECK(json_valid(document)), UNIQUE(run_id,sender,idempotency_key));
             CREATE INDEX IF NOT EXISTS messages_inbox ON messages(recipient,state,expires_at);
             CREATE INDEX IF NOT EXISTS messages_run ON messages(run_id);
+            CREATE INDEX IF NOT EXISTS publications_run_page ON entities(json_extract(document,'$.runId')) WHERE collection='publications';
             CREATE INDEX IF NOT EXISTS messages_dedup ON messages(correlation_id,sender,recipient,body_hash);
             PRAGMA user_version=2; COMMIT;")?;
         Ok(Self { connection })

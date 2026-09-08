@@ -3,6 +3,7 @@ pub const SCHEMA_VERSION: u32 = 1;
 pub mod artifacts;
 pub mod backup;
 pub mod codex;
+pub mod communication;
 pub mod configuration_export;
 pub mod connections;
 pub mod engine;

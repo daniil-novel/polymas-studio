@@ -291,4 +291,6 @@ D17e CU: отдельный read-only HTTP stand на 1434 с production fronten
 D17f: RED завершённая/принятая task после исключения из in-memory scheduler возвращала 404, хотя durable record сохранился. GREEN owner GET возвращает точный сохранённый Task, включая Unicode result/роль/критерии; неверный token получает 401, неизвестный ID — 404, список задач не содержит private markers, event head не меняется. Проверены четыре history + четыре HTTP tests и daemon clippy. Только чтение; рабочий набор/admission/исполнение и gate масштабирования D20 не изменены.
 # D26 communication evidence
 
+D26b2: RED отсутствовал модуль публикаций. GREEN два regression: SQLite reopen и exact retry без нового события/расхода бюджета, другой автор с тем же ключом, конфликт параметров, превышение размера Unicode/бюджета, запрет редактирования board, отсутствие чужого run, фильтрация доступа до limit и атомарный отказ. Четыре прежних message tests и core clippy пройдены. Это storage protocol, не эксперимент качества LLM.
+
 D26b1: RED два regression отвергали неизвестное communicationMode. GREEN проверяет roundtrip всех четырёх значений без изменения топологии, legacy default direct, неизвестный enum и запрет direct send в shared mode без события. Это модель конфигурации; agent gateway и UI новых протоколов ещё не подключены.
