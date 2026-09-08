@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Only the main local editor can invoke the bounded native bridge and lifecycle commands.",
+  "windows": ["main"],
+  "permissions": ["allow-api-request", "allow-desktop-status", "allow-desktop-reconnect", "allow-desktop-close", "allow-desktop-cancel-close", "allow-desktop-reset-close", "core:event:allow-listen", "core:event:allow-unlisten"]
+}

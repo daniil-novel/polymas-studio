@@ -1,0 +1,32 @@
+[package]
+name = "polymas-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+url = "2"
+
+[target.'cfg(windows)'.dependencies]
+tauri = { version = "=2.11.5", features = ["tray-icon", "image-ico"] }
+tauri-plugin-single-instance = "=2.4.4"
+polymas-desktop-host = { path = "../../../crates/polymas-desktop-host" }
+polymas-core = { path = "../../../crates/polymas-core" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+fs2 = "0.4.3"
+
+[target.'cfg(windows)'.build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[target.'cfg(windows)'.dev-dependencies]
+tauri = { version = "=2.11.5", features = ["test"] }
+tempfile.workspace = true
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[lints]
+workspace = true

@@ -1,5 +1,54 @@
 use polymas_desktop_host::service::RunningService;
 use serde_json::json;
+
+#[tokio::test]
+#[ignore = "Opt-in: writes then removes an isolated fixture in the real OS credential vault"]
+async fn native_profile_reconnects_through_the_real_os_vault() {
+    let dir = tempfile::tempdir().unwrap();
+    let namespace = format!("native-smoke-{}", uuid::Uuid::new_v4());
+    let vault = polymas_core::secrets::OsVault::new(&namespace).unwrap();
+    let profile_dir = dir.path().join("profile");
+    let workspace = dir.path().join("workspace");
+    let executable = std::path::Path::new(env!("CARGO_BIN_EXE_polymas-daemon"));
+    let first = polymas_desktop_host::profile::NativeProfile::connect(
+        &profile_dir,
+        &workspace,
+        executable,
+        1,
+        &vault,
+    )
+    .await
+    .unwrap();
+    let pid = first.record.pid;
+    let reference = first.record.credential_ref.clone();
+    let cleanup_connection = first.connection.clone();
+    drop(first);
+    let second = polymas_desktop_host::profile::NativeProfile::connect(
+        &profile_dir,
+        &workspace,
+        executable,
+        1,
+        &polymas_core::secrets::OsVault::new(&namespace).unwrap(),
+    )
+    .await;
+    let second = match second {
+        Ok(second) => second,
+        Err(error) => {
+            cleanup_connection
+                .request("/api/control", Some(json!({"action":"shutdown"})))
+                .await
+                .ok();
+            vault.remove(&reference).ok();
+            panic!("Reconnect failed: {error}");
+        }
+    };
+    let reused = second.reused && second.record.pid == pid;
+    let result = second.stop().await;
+    let cleanup = vault.remove(&reference);
+    result.unwrap();
+    cleanup.unwrap();
+    assert!(reused);
+}
 #[tokio::test]
 async fn service_startup_expires_without_a_durable_desktop_adoption() {
     use tokio::io::AsyncBufReadExt;

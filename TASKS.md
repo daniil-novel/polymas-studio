@@ -44,6 +44,7 @@
   - [x] D14f. Durable native profile, startup lock и reconnect без нового процесса; Tauri окно и OS vault smoke далее.
   - [x] D14g. Сохраняемая политика закрытия с reset; применение в Tauri и диалог далее.
   - [x] D14h. Frontend lifecycle dialog и reconnect для native startup; Tauri commands и visual native verification далее.
+  - [x] D14i. Tauri shell, IPC ACL, tray, single instance, staging/build; standalone process и real OS vault smoke. Native visual/close-through-window gate остаётся открытым из-за недоступного Windows CU helper; capacity/workspace/settings и installer drain далее.
 - [ ] D15. Формы ролей и массового создания экземпляров.
   - [x] D15b. Форма архитектуры и холонов с сохранением через ревизии; ресурсные scaling rules далее в D20.
   - [x] D15a. Роль, новая версия, массовое создание, список экземпляров и stale-form guard; расширенные действия экземпляров далее.

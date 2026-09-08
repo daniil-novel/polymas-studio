@@ -1,5 +1,9 @@
 # Проверки реализации
 
+D14i: RED отсутствующий navigation guard; IPC regression действительно исполняет Tauri dispatch с generated capabilities (MockRuntime), main/local получает status и structured not_ready, другое окно/внешний origin отклонены. RED verify_no_service → GREEN нельзя назвать занятый workspace остановленным. Три native shell tests/clippy; `tauri build --debug --no-bundle` создал настоящий exe со встроенным React. На Windows 10 запущен PID 9948 с title PolyMAS Studio, создан default workspace и daemon PID 4788; stderr пуст. Отдельный opt-in actual OS vault reconnect/stop/credential cleanup прошёл. Это не подтверждение интерактивного tray/close: Windows Computer Use после reset дважды вернул `failed to write kernel assets (os error 3)`. Browser CU shared React 1600×1000: 12 узлов в 3 группах, инспектор/мини-карта/история без обрезания; error/warn log пуст. Windows 11, installer drain/signing и native screenshot gate ещё открыты.
+
+Native build correction: lib test первоначально завершался STATUS_ENTRYPOINT_NOT_FOUND; подтверждено наличие TaskDialogIndirect import и отсутствие manifest resource. Общая Common Controls v6 dependency исправила запуск. Удаление дублирующего resource manifest исправило CVT1100/LNK1123 executable сборки; ОС не модифицировалась.
+
 D14h: RED отсутствующий DesktopLifecycle и лишнее поле control token при native failure. GREEN три frontend regression: закрытие только после выбора, точные behavior/remember, ошибка остановки сохраняет dialog, startup failure предлагает reconnect. Полная UI suite 29 tests/typecheck/lint/build. Native events/invoke в этих тестах имитируются; Tauri wiring и визуальная проверка следуют отдельно.
 
 D14g: RED отсутствующий Preferences. GREEN первый запуск требует выбора, background/stop сохраняются после reopen, reset возвращает вопрос, неизвестный enum отклонён. Три desktop-host tests и clippy пройдены. Это persistence, не ещё проверенное поведение окна.

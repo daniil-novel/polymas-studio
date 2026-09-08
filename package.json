@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "format:check": "prettier --check apps/desktop/src tests/frontend",
-    "desktop": "tauri dev --config apps/desktop/src-tauri/tauri.conf.json"
+    "desktop": "pwsh -NoProfile -File scripts/desktop.ps1",
+    "desktop:build": "pwsh -NoProfile -File scripts/desktop.ps1 -Build"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",
