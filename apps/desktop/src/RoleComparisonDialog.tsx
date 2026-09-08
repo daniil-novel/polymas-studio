@@ -14,12 +14,14 @@ export function RoleComparisonDialog({
   connected,
   onClose,
   onRestore,
+  onDuplicate,
 }: {
   comparison: RoleComparison;
   currentRevision: number;
   connected: boolean;
   onClose: () => void;
   onRestore?: (source: Role) => void;
+  onDuplicate?: (source: Role) => void;
 }) {
   const { versions, revision } = comparison;
   const [beforeVersion, setBefore] = useState(versions[1]?.version ?? versions[0]?.version);
@@ -138,6 +140,20 @@ export function RoleComparisonDialog({
                 </button>
                 <p className="small muted">
                   Откроется проверка создания новой версии. Назначения экземпляров сохранятся.
+                </p>
+              </div>
+            )}
+            {onDuplicate && (
+              <div className="role-diff-restore-action">
+                <button
+                  disabled={!connected || currentRevision !== revision}
+                  onClick={() => onDuplicate(before)}
+                >
+                  Дублировать исходную версию
+                </button>
+                <p className="small muted">
+                  Создать отдельную роль из сохранённого источника. Сначала проверьте имя и поля
+                  копии.
                 </p>
               </div>
             )}

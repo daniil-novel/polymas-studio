@@ -107,6 +107,12 @@
 .role-diff-restore-action {
   margin: 16px 0;
 }
+.role-duplication-recovery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0;
+}
 .restore-all-fields {
   display: flex;
   gap: 8px;

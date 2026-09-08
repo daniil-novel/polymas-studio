@@ -5,6 +5,7 @@ import type { GraphNode } from './graph/model';
 import { AgentDirectory } from './AgentDirectory';
 import { RoleComparisonDialog, type RoleComparison } from './RoleComparisonDialog';
 import { RoleRestoreDialog } from './RoleRestoreDialog';
+import { RoleDuplicationActions } from './RoleDuplicationActions';
 import type { RefreshWorkspace } from './AgentNameEditor';
 import './roles.css';
 export type Command = (path: string, body: unknown) => Promise<unknown>;
@@ -54,6 +55,11 @@ export function RoleEditor({
   const [restoring, setRestoring] = useState<{ roleId: string; sourceVersion: number } | null>(
     null,
   );
+  const [duplicating, setDuplicating] = useState<{
+    roleId: string;
+    sourceVersion: number;
+    workspaceId: string;
+  } | null>(null);
   const latest = useMemo(
     () =>
       Array.from(
@@ -206,6 +212,22 @@ export function RoleEditor({
         >
           Сравнить версии
         </button>
+      )}
+      {refresh && (
+        <RoleDuplicationActions
+          key={`role-duplication:${snapshot.config.value.id}`}
+          source={duplicating?.workspaceId === snapshot.config.value.id ? duplicating : null}
+          snapshot={snapshot}
+          connected={connected}
+          refresh={refresh}
+          command={command}
+          onClose={() => setDuplicating(null)}
+          onSaved={(role) =>
+            setSuccess(
+              `Создана роль «${role.name}» · v1. ID: ${role.id}. Назначения экземпляров сохранены.`,
+            )
+          }
+        />
       )}
       {error && (
         <p className="form-error" role="alert">
@@ -540,6 +562,18 @@ export function RoleEditor({
           currentRevision={snapshot.config.revision}
           connected={connected}
           onClose={() => setComparison(null)}
+          onDuplicate={
+            refresh
+              ? (source) => {
+                  setComparison(null);
+                  setDuplicating({
+                    roleId: source.id,
+                    sourceVersion: source.version,
+                    workspaceId: snapshot.config.value.id,
+                  });
+                }
+              : undefined
+          }
           onRestore={
             refresh
               ? (source) => {
