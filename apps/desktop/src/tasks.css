@@ -24,6 +24,41 @@
 }
 .runs-sidebar {
   min-width: 0;
+  max-height: calc(100vh - 210px);
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding-right: 6px;
+}
+.tasks-main {
+  min-width: 0;
+}
+.history-filters {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+  font-size: 12px;
+}
+.history-filters input,
+.history-filters select,
+.run-task-browser select {
+  min-width: 0;
+  width: 100%;
+}
+.history-refresh {
+  margin-top: 14px;
+}
+.run-task-browser {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 12px;
+}
+.run-task-browser .task-selector {
+  margin: 0;
 }
 .runs-sidebar h3 {
   font-size: 14px;
@@ -257,7 +292,8 @@
     grid-template-columns: 1fr;
   }
   .runs-sidebar {
-    max-height: 200px;
+    min-height: 320px;
+    max-height: min(46vh, 420px);
     overflow: auto;
   }
 }

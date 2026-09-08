@@ -413,6 +413,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                 )}
                 <div hidden={page !== 'tasks'}>
                   <TasksWorkspace
+                    active={page === 'tasks' && connected}
                     snapshot={snapshot}
                     events={events}
                     client={client}

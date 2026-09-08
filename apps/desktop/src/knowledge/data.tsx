@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ApiClient } from '../api';
 import type { Page } from './model';
 export function useRemote<T>(
@@ -6,21 +6,26 @@ export function useRemote<T>(
   path: string,
   refresh: number,
   backgroundRefresh = 0,
+  enabled = true,
 ) {
+  const activation = useMemo(() => ({ enabled }), [enabled]);
   const [state, setState] = useState<{
     client: ApiClient;
     path: string;
     refresh: number;
     backgroundRefresh: number;
+    activation: object;
     data?: T;
     error?: string;
   }>();
   useEffect(() => {
+    if (!enabled) return;
     const abort = new AbortController();
     client
       .request<T>(path, undefined, abort.signal)
       .then((data) => {
-        if (!abort.signal.aborted) setState({ client, path, refresh, backgroundRefresh, data });
+        if (!abort.signal.aborted)
+          setState({ client, path, refresh, backgroundRefresh, activation, data });
       })
       .catch((error: unknown) => {
         if (!abort.signal.aborted)
@@ -29,6 +34,7 @@ export function useRemote<T>(
             path,
             refresh,
             backgroundRefresh,
+            activation,
             data:
               previous?.client === client && previous.path === path && previous.refresh === refresh
                 ? previous.data
@@ -37,34 +43,48 @@ export function useRemote<T>(
           }));
       });
     return () => abort.abort();
-  }, [client, path, refresh, backgroundRefresh]);
+  }, [client, path, refresh, backgroundRefresh, enabled, activation]);
   // Explicit refresh/path/client changes invalidate review; polling preserves its DOM only.
   const current =
     state?.client === client && state.path === path && state.refresh === refresh ? state : null;
   return {
     data: current?.data,
     error: current?.error,
-    loading: !current || current.backgroundRefresh !== backgroundRefresh,
+    loading:
+      !current ||
+      current.backgroundRefresh !== backgroundRefresh ||
+      current.activation !== activation,
   };
 }
 export function usePage<T>(client: ApiClient, base: string, refresh: number) {
+  return useCursorPage<Page<T>['items'][number], Page<T>>(client, base, refresh);
+}
+export function useCursorPage<
+  T,
+  P extends { items: T[]; nextCursor: string | null } = { items: T[]; nextCursor: string | null },
+>(client: ApiClient, base: string, refresh: number, backgroundRefresh = 0, enabled = true) {
   const [navigation, setNavigation] = useState<{ base: string; cursors: string[] }>({
     base,
     cursors: [],
   });
+  useEffect(() => {
+    if (navigation.base !== base) setNavigation({ base, cursors: [] });
+  }, [base, navigation.base]);
   const cursors = navigation.base === base ? navigation.cursors : [];
   const cursor = cursors.at(-1);
-  const remote = useRemote<Page<T>>(
+  const remote = useRemote<P>(
     client,
     `${base}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
     refresh,
+    backgroundRefresh,
+    enabled,
   );
   return {
     ...remote,
     number: cursors.length + 1,
     previous: () => setNavigation({ base, cursors: cursors.slice(0, -1) }),
     next: () => {
-      if (remote.data?.nextCursor)
+      if (!remote.loading && !remote.error && remote.data?.nextCursor)
         setNavigation({ base, cursors: [...cursors, remote.data.nextCursor] });
     },
   };
@@ -99,14 +119,14 @@ export function useKnowledgeCommand(client: ApiClient, onSaved: () => void) {
   }
   return { busy, error, save };
 }
-export function Pager({ page, label }: { page: ReturnType<typeof usePage>; label: string }) {
+export function Pager({ page, label }: { page: ReturnType<typeof useCursorPage>; label: string }) {
   return (
     <nav className="knowledge-pager" aria-label={label}>
-      <button disabled={page.loading || page.number === 1} onClick={page.previous}>
+      <button disabled={page.loading || !!page.error || page.number === 1} onClick={page.previous}>
         Назад
       </button>
       <span>Стр. {page.number}</span>
-      <button disabled={page.loading || !page.data?.nextCursor} onClick={page.next}>
+      <button disabled={page.loading || !!page.error || !page.data?.nextCursor} onClick={page.next}>
         Далее
       </button>
     </nav>
