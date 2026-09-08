@@ -104,6 +104,22 @@
 .role-diff-pages button {
   font-size: 11px;
 }
+.role-diff-restore-action {
+  margin: 16px 0;
+}
+.restore-all-fields {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 16px 0;
+}
+.restore-all-fields input {
+  width: auto;
+  min-height: 0;
+}
+.role-comparison .dialog-actions {
+  flex-wrap: wrap;
+}
 @media (max-width: 800px) {
   .role-comparison > header {
     flex-direction: column;

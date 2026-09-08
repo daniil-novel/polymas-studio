@@ -4,6 +4,7 @@ import type { Role, RoleDraft, Snapshot } from './types';
 import type { GraphNode } from './graph/model';
 import { AgentDirectory } from './AgentDirectory';
 import { RoleComparisonDialog, type RoleComparison } from './RoleComparisonDialog';
+import { RoleRestoreDialog } from './RoleRestoreDialog';
 import type { RefreshWorkspace } from './AgentNameEditor';
 import './roles.css';
 export type Command = (path: string, body: unknown) => Promise<unknown>;
@@ -50,6 +51,9 @@ export function RoleEditor({
   const [tab, setTab] = useState<'editor' | 'instances'>('editor');
   const [pendingRole, setPendingRole] = useState<string | null>(null);
   const [comparison, setComparison] = useState<RoleComparison | null>(null);
+  const [restoring, setRestoring] = useState<{ roleId: string; sourceVersion: number } | null>(
+    null,
+  );
   const latest = useMemo(
     () =>
       Array.from(
@@ -103,7 +107,7 @@ export function RoleEditor({
   }
   async function save(create: boolean) {
     if (stale) {
-      setError('Роль изменилась в другом редакторе');
+      setError('Сохранённая версия роли изменилась');
       return;
     }
     setBusy(true);
@@ -210,7 +214,7 @@ export function RoleEditor({
       )}
       {stale && (
         <div className="form-error">
-          <p>Роль изменилась в другом редакторе</p>
+          <p>Сохранённая версия роли изменилась</p>
           <button onClick={() => setPendingRole(roleId)}>Загрузить новую версию</button>
           <p className="small">
             Черновик сохранён в форме. Скопируйте нужные изменения перед обновлением.
@@ -535,6 +539,30 @@ export function RoleEditor({
           currentRevision={snapshot.config.revision}
           connected={connected}
           onClose={() => setComparison(null)}
+          onRestore={
+            refresh
+              ? (source) => {
+                  setComparison(null);
+                  setRestoring({ roleId: source.id, sourceVersion: source.version });
+                }
+              : undefined
+          }
+        />
+      )}
+      {restoring && refresh && (
+        <RoleRestoreDialog
+          {...restoring}
+          snapshot={snapshot}
+          connected={connected}
+          refresh={refresh}
+          command={command}
+          onClose={() => setRestoring(null)}
+          onSaved={(version) => {
+            setRestoring(null);
+            setSuccess(
+              `Восстановленная версия v${version} создана. Назначения экземпляров сохранены.`,
+            );
+          }}
         />
       )}
     </div>

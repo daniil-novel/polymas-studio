@@ -1,64 +1,9 @@
 import { useState } from 'react';
 import { Modal } from './Modal';
-import { TEXT_PAGE_SIZE, textPage } from './text-pages';
-import type { Role, RoleDraft } from './types';
+import { RoleComparisonFields, ROLE_FIELD_COUNT, changedRoleFields } from './RoleComparisonFields';
+import type { Role } from './types';
 import './role-comparison.css';
 
-const labels: Record<keyof RoleDraft, string> = {
-  name: 'Название роли',
-  description: 'Описание',
-  instruction: 'Ролевая инструкция',
-  outputContract: 'Формат результата',
-  acceptanceCriteria: 'Критерии приёмки',
-  escalationRule: 'Правило эскалации',
-  model: 'Модель',
-  sandbox: 'Доступ к рабочей папке',
-  timeoutSeconds: 'Таймаут, секунд',
-  maxTurns: 'Максимум попыток',
-  maxOutputTokens: 'Лимит токенов результата',
-};
-const fields = Object.keys(labels) as (keyof RoleDraft)[];
-function display(role: Role, field: keyof RoleDraft) {
-  const value = role[field];
-  if (value === null) return field === 'model' ? 'По умолчанию в Codex' : 'Не задан';
-  if (value === '') return 'Пустое значение';
-  if (field === 'sandbox')
-    return value === 'read-only' ? 'Только чтение' : 'Запись в рабочую папку агента';
-  return String(value);
-}
-function TextValue({ text, label, version }: { text: string; label: string; version: number }) {
-  const [page, setPage] = useState(0);
-  const count = Math.max(1, Math.ceil(text.length / TEXT_PAGE_SIZE));
-  return (
-    <section className="role-diff-value" aria-label={label}>
-      <span className="small muted">
-        {label} · v{version}
-      </span>
-      <pre
-        role="textbox"
-        aria-label={label}
-        aria-readonly="true"
-        aria-multiline="true"
-        tabIndex={0}
-      >
-        {textPage(text, page)}
-      </pre>
-      {count > 1 && (
-        <nav className="role-diff-pages" aria-label={`Части: ${label}`}>
-          <button disabled={page === 0} onClick={() => setPage(page - 1)}>
-            Предыдущая часть
-          </button>
-          <span>
-            {page + 1} / {count}
-          </span>
-          <button disabled={page + 1 === count} onClick={() => setPage(page + 1)}>
-            Следующая часть
-          </button>
-        </nav>
-      )}
-    </section>
-  );
-}
 export interface RoleComparison {
   versions: Role[];
   revision: number;
@@ -68,11 +13,13 @@ export function RoleComparisonDialog({
   currentRevision,
   connected,
   onClose,
+  onRestore,
 }: {
   comparison: RoleComparison;
   currentRevision: number;
   connected: boolean;
   onClose: () => void;
+  onRestore?: (source: Role) => void;
 }) {
   const { versions, revision } = comparison;
   const [beforeVersion, setBefore] = useState(versions[1]?.version ?? versions[0]?.version);
@@ -83,7 +30,7 @@ export function RoleComparisonDialog({
   const after = versions.find((v) => v.version === afterVersion);
   const needle = query.trim().toLowerCase().replace(/^v/, '');
   const matching = versions.filter((v) => !needle || String(v.version) === needle);
-  const changed = before && after ? fields.filter((field) => before[field] !== after[field]) : [];
+  const changed = before && after ? changedRoleFields(before, after) : [];
   const options = (selected: number) => {
     const list = matching.slice(0, 100);
     const role = versions.find((v) => v.version === selected);
@@ -165,7 +112,7 @@ export function RoleComparisonDialog({
             )}
             <div className="role-diff-summary">
               <strong>
-                Изменённых полей: {changed.length} из {fields.length}
+                Изменённых полей: {changed.length} из {ROLE_FIELD_COUNT}
               </strong>
               <label>
                 <input
@@ -177,32 +124,24 @@ export function RoleComparisonDialog({
               </label>
             </div>
             {onlyChanged && changed.length === 0 && <p>Выбранные версии имеют одинаковые поля.</p>}
-            {fields
-              .filter((field) => !onlyChanged || changed.includes(field))
-              .map((field) => (
-                <article
-                  key={`${field}:${beforeVersion}:${afterVersion}`}
-                  className={`role-diff-field ${changed.includes(field) ? 'changed' : ''}`}
-                  aria-label={labels[field]}
+            {onRestore && (
+              <div className="role-diff-restore-action">
+                <button
+                  disabled={
+                    !connected ||
+                    currentRevision !== revision ||
+                    before.version >= versions[0].version
+                  }
+                  onClick={() => onRestore(before)}
                 >
-                  <h3>
-                    {labels[field]}
-                    <span>{changed.includes(field) ? 'Изменено' : 'Без изменений'}</span>
-                  </h3>
-                  <div className="role-diff-pair">
-                    <TextValue
-                      text={display(before, field)}
-                      label="Исходное значение"
-                      version={beforeVersion}
-                    />
-                    <TextValue
-                      text={display(after, field)}
-                      label="Новое значение"
-                      version={afterVersion}
-                    />
-                  </div>
-                </article>
-              ))}
+                  Восстановить исходную версию
+                </button>
+                <p className="small muted">
+                  Откроется проверка создания новой версии. Назначения экземпляров сохранятся.
+                </p>
+              </div>
+            )}
+            <RoleComparisonFields before={before} after={after} onlyChanged={onlyChanged} />
           </>
         ) : (
           <p>Нет сохранённых версий для сравнения.</p>

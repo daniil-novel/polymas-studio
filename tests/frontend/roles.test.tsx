@@ -80,7 +80,7 @@ test('a role changed elsewhere cannot be overwritten by an old open form', async
   await user.selectOptions(screen.getByLabelText('Выбрать роль'), 'role-a');
   await user.type(screen.getByLabelText('Ролевая инструкция'), ' Local changes');
   view.rerender(<RoleEditor snapshot={make(2)} command={command} />);
-  expect(await screen.findByText('Роль изменилась в другом редакторе')).toBeTruthy();
+  expect(await screen.findByText('Сохранённая версия роли изменилась')).toBeTruthy();
   expect(
     (screen.getByRole('button', { name: 'Сохранить роль' }) as HTMLButtonElement).disabled,
   ).toBe(true);
