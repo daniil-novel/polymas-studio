@@ -111,7 +111,7 @@ pub fn authorize_tool(
 
 /// The exact operation approved by a person. A new lease or connection revision
 /// invalidates an old approval, even if its arguments happen to be identical.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Operation {
     pub agent_id: String,
@@ -130,6 +130,14 @@ pub struct Operation {
     pub connection_revision: i64,
     pub tool: String,
     pub arguments: Value,
+}
+impl std::fmt::Debug for Operation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Operation")
+            .field("origin_epoch", &self.origin_epoch)
+            .field("epoch", &self.epoch)
+            .finish_non_exhaustive()
+    }
 }
 impl Operation {
     pub fn fingerprint(&self) -> Result<String> {

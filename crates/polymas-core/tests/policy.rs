@@ -18,6 +18,22 @@ fn operation() -> Operation {
     }
 }
 #[test]
+fn approval_debug_never_exposes_private_operation_arguments() {
+    let mut db = Store::memory().unwrap();
+    let mut op = operation();
+    op.arguments =
+        json!({"document":"private-document-path", "nested":{"text":"private-operation-content"}});
+    let approval = ApprovalLedger::request(&mut db, op, 100, 30).unwrap();
+    let diagnostic = format!("{approval:?}");
+    assert!(diagnostic.contains("Operation") && diagnostic.contains("epoch: 7"));
+    assert!(!diagnostic.contains("private-document-path"));
+    assert!(!diagnostic.contains("private-operation-content"));
+    assert_eq!(
+        approval.operation.arguments["nested"]["text"],
+        "private-operation-content"
+    );
+}
+#[test]
 fn an_approval_is_bound_to_distinct_origin_and_execution_attempts() {
     let mut value = serde_json::to_value(operation()).unwrap();
     value["originEpoch"] = json!(6);
