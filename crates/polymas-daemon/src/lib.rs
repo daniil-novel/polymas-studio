@@ -1,6 +1,7 @@
 //! Local authenticated control plane. The desktop and worker bridge use separate credentials.
 pub mod connection_api;
 pub mod gateway;
+pub mod gateway_tools;
 pub mod run_api;
 pub mod runtime;
 use axum::{

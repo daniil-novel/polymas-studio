@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D10d: RED /gateway/call возвращал 404. GREEN: catalog с фильтром и лимитом → чтение fixture marker из реального файла; чужой namespace, traversal, impersonation и отозванный binding отклонены; call_completed есть, содержимого файла в events нет. Три gateway tests и clippy. Bridge ещё не подключён к Codex; write tools fail closed до approval orchestration. Контракт проверен по [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) и [transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports), локальный rmcp 3.2.0.
+
 D10c: RED отсутствующий gateway module. GREEN: scoped context, запрет control token/Origin, запрет обратного доступа к admin API, отзыв при Drop и завершении task, отсутствие credential в durable events. Два regression tests и clippy. Это авторизация transport, MCP forwarding подключается следующим срезом.
 
 D17 acceptance consistency: RED показал accepted task при Artifact.accepted=false. GREEN: задача и артефакт принимаются одной транзакцией; отсутствующий второй artifact откатывает первую запись и event cursor. Полная проверка Rust/UI/spec пройдена до коммита. Исторические workspace с прежним несогласованным флагом требуют отдельной миграции, тест проверяет новые операции.

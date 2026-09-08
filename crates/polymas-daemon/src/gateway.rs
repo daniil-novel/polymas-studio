@@ -6,7 +6,7 @@ use axum::{
     http::{StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use polymas_core::{
     engine::Engine,
@@ -14,7 +14,7 @@ use polymas_core::{
     scheduler::TaskState,
     secrets::Secret,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::{
@@ -22,7 +22,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Scope {
     pub agent_id: String,
@@ -30,6 +30,8 @@ pub struct Scope {
     pub run_id: String,
     pub epoch: u64,
     pub expires_at: i64,
+    #[serde(skip)]
+    pub call_limit: Arc<tokio::sync::Semaphore>,
 }
 #[derive(Clone, Default)]
 pub struct Scopes(Arc<Mutex<BTreeMap<String, Scope>>>);
@@ -62,6 +64,7 @@ pub async fn issue(state: &AppState, task_id: &str) -> Result<Grant> {
             .ok_or_else(|| Error::Denied("Нет активной попытки".into()))?
             .epoch,
         expires_at: chrono::Utc::now().timestamp() + task.role.draft.timeout_seconds as i64 + 30,
+        call_limit: Arc::new(tokio::sync::Semaphore::new(1)),
     };
     validate(&engine, &scope)?;
     let token = Secret::new(format!(
@@ -105,6 +108,8 @@ pub fn validate(engine: &Engine, scope: &Scope) -> Result<()> {
 pub fn routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/gateway/context", get(context))
+        .route("/gateway/tools", get(crate::gateway_tools::list))
+        .route("/gateway/call", post(crate::gateway_tools::call))
         .layer(DefaultBodyLimit::max(128 * 1024))
         .route_layer(middleware::from_fn_with_state(state, authorize))
 }

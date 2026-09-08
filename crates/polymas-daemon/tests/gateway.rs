@@ -43,6 +43,41 @@ async fn setup() -> (tempfile::TempDir, AppState, String) {
             },
         )
         .unwrap();
+    let roots = dir.path().join("knowledge");
+    std::fs::create_dir(&roots).unwrap();
+    std::fs::write(roots.join("guide.txt"), "GATEWAY-READ-93").unwrap();
+    let mut connection = polymas_core::connections::Connection::files("Knowledge", vec![roots]);
+    connection.tools = polymas_core::connections::files_tools();
+    connection.tool_allowlist = vec!["read_text".into(), "list_files".into()];
+    connection.health = polymas_core::connections::Health::Ready;
+    connection.enabled = true;
+    let connection_id = connection.id.clone();
+    polymas_daemon::connection_api::persist_connection(
+        &mut engine,
+        0,
+        connection,
+        "fixture.connection",
+    )
+    .unwrap();
+    let agent_id = engine.workspace.config().value.registry.agents[0]
+        .id
+        .clone();
+    engine
+        .configure(
+            3,
+            ConfigCommand::SetBindings {
+                bindings: vec![polymas_core::policy::Binding {
+                    id: "reader-binding".into(),
+                    connection_id,
+                    subject: polymas_core::policy::Subject::Agent { id: agent_id },
+                    tools: ["read_text".into(), "list_files".into()].into(),
+                    allow_write: false,
+                    required: false,
+                    namespace: "shared".into(),
+                }],
+            },
+        )
+        .unwrap();
     let run = engine
         .submit(
             "run",
@@ -145,4 +180,107 @@ async fn finishing_or_cancelling_a_task_revokes_access_before_guard_cleanup() {
         StatusCode::FORBIDDEN
     );
     assert!(issue(&state, &task_id).await.is_err());
+}
+
+async fn call(state: &AppState, token: &str, name: &str, arguments: Value) -> (StatusCode, Value) {
+    let response = router(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/gateway/call")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"name":name,"arguments":arguments}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+#[tokio::test]
+async fn source_discovery_and_calls_apply_live_and_pinned_bindings_and_record_real_completion() {
+    let (_dir, state, task_id) = setup().await;
+    let grant = issue(&state, &task_id).await.unwrap();
+    let (status, catalog) = call(
+        &state,
+        grant.token.expose(),
+        "polymas_list_sources",
+        json!({"query":"read_text","limit":1}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(catalog["isError"], false);
+    let catalog: Value =
+        serde_json::from_str(catalog["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(catalog["items"].as_array().unwrap().len(), 1);
+    let connection = catalog["items"][0]["connectionId"].as_str().unwrap();
+    let input = json!({"connectionId":connection,"namespace":"shared","tool":"read_text","arguments":{"root":0,"path":"guide.txt"}});
+    let (status, result) = call(
+        &state,
+        grant.token.expose(),
+        "polymas_call_source",
+        input.clone(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(result["content"][0]["text"], "GATEWAY-READ-93");
+    let mut wrong_namespace = input.clone();
+    wrong_namespace["namespace"] = json!("private");
+    assert_eq!(
+        call(
+            &state,
+            grant.token.expose(),
+            "polymas_call_source",
+            wrong_namespace
+        )
+        .await
+        .1["isError"],
+        true
+    );
+    let mut escape = input.clone();
+    escape["arguments"]["path"] = json!("../outside.txt");
+    assert_eq!(
+        call(&state, grant.token.expose(), "polymas_call_source", escape)
+            .await
+            .1["isError"],
+        true
+    );
+    let mut impersonate = input.clone();
+    impersonate["agentId"] = json!("someone-else");
+    assert_eq!(
+        call(
+            &state,
+            grant.token.expose(),
+            "polymas_call_source",
+            impersonate
+        )
+        .await
+        .1["isError"],
+        true
+    );
+    let mut engine = state.engine.lock().await;
+    let events = engine.workspace.db.events(0, 5000, None).unwrap();
+    assert!(events.iter().any(|e| e.input.kind == "mcp.call_completed"));
+    assert!(
+        !json!(events).to_string().contains("GATEWAY-READ-93"),
+        "Source content is not copied into the activity log"
+    );
+    let revision = engine.workspace.config().revision;
+    engine
+        .configure(revision, ConfigCommand::SetBindings { bindings: vec![] })
+        .unwrap();
+    drop(engine);
+    assert_eq!(
+        call(&state, grant.token.expose(), "polymas_call_source", input)
+            .await
+            .1["isError"],
+        true
+    );
 }
