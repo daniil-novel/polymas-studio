@@ -10,6 +10,39 @@ fn role(name: &str) -> RoleDraft {
 }
 
 #[test]
+fn numbered_names_support_zero_padding_and_reject_unknown_template_syntax_atomically() {
+    let mut registry = Registry::default();
+    let role = registry.create_role(role("Analyst")).unwrap();
+    registry
+        .create_batch(
+            "padded",
+            BatchRequest {
+                role_id: role.id.clone(),
+                role_version: 1,
+                count: 2,
+                name_pattern: "Аналитик · {n:02}".into(),
+            },
+        )
+        .unwrap();
+    assert_eq!(registry.agents[0].name, "Аналитик · 01");
+    assert_eq!(registry.agents[1].name, "Аналитик · 02");
+    assert!(
+        registry
+            .create_batch(
+                "bad",
+                BatchRequest {
+                    role_id: role.id,
+                    role_version: 1,
+                    count: 2,
+                    name_pattern: "Аналитик · {n:99}".into()
+                }
+            )
+            .is_err()
+    );
+    assert_eq!(registry.agents.len(), 2);
+}
+
+#[test]
 fn thousand_instances_have_distinct_identity_and_private_workspace() {
     let mut registry = Registry::default();
     let role = registry.create_role(role("Researcher")).unwrap();

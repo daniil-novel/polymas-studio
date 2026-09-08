@@ -225,13 +225,28 @@ impl Registry {
             !request.name_pattern.trim().is_empty() && request.name_pattern.len() <= 200,
             "Шаблон имени обязателен (до 200 байт)",
         )?;
+        let formatter =
+            regex::Regex::new(r"\{n(?::0([1-8]))?\}").map_err(|e| Error::Runtime(e.to_string()))?;
+        let literal = formatter.replace_all(&request.name_pattern, "");
+        require(
+            !literal.contains(['{', '}']),
+            "Используйте {n} или {n:02}; ширина номера от 1 до 8",
+        )?;
         let created: Vec<_> = (1..=request.count)
             .map(|n| {
                 let id = id("agent");
                 AgentInstance {
                     workspace_key: id.clone(),
                     id,
-                    name: request.name_pattern.replace("{n}", &n.to_string()),
+                    name: formatter
+                        .replace_all(&request.name_pattern, |capture: &regex::Captures<'_>| {
+                            let width = capture
+                                .get(1)
+                                .map(|v| usize::from(v.as_str().as_bytes()[0] - b'0'))
+                                .unwrap_or(0);
+                            format!("{n:0width$}")
+                        })
+                        .into_owned(),
                     role_id: request.role_id.clone(),
                     role_version: request.role_version,
                     session_id: None,
@@ -242,6 +257,10 @@ impl Registry {
                 }
             })
             .collect();
+        require(
+            created.iter().all(|a| a.name.len() <= 200),
+            "Имена экземпляров превышают 200 байт",
+        )?;
         let ids = created.iter().map(|a| a.id.clone()).collect::<Vec<_>>();
         self.agents.extend(created);
         self.batch_receipts
