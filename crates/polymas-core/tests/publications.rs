@@ -24,6 +24,72 @@ fn input(key: &str) -> PublicationInput {
 }
 
 #[test]
+fn receipts_written_before_graph_links_remain_retryable_after_upgrade() {
+    use serde_json::{Value, json};
+    use sha2::{Digest, Sha256};
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct LegacyInput {
+        key: String,
+        title: String,
+        body: String,
+        slug: Option<String>,
+        expected_revision: u32,
+    }
+    let mut db = Store::memory().unwrap();
+    let exchange = scope("a");
+    let draft = input("legacy");
+    let first = Publications::publish(&mut db, &exchange, draft.clone()).unwrap();
+    let old = LegacyInput {
+        key: draft.key.clone(),
+        title: draft.title.clone(),
+        body: draft.body.clone(),
+        slug: None,
+        expected_revision: 0,
+    };
+    let fingerprint = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&(exchange.mode, old)).unwrap())
+    );
+    let key = format!(
+        "{:x}",
+        Sha256::digest(
+            serde_json::to_vec(&(&exchange.run_id, &exchange.author, &draft.key)).unwrap()
+        )
+    );
+    // Authored pre-links receipt using the exact historical field order.
+    db.transaction(|tx| {
+        let saved = tx.get::<Value>("publication_receipts", &key)?.unwrap();
+        tx.put(
+            "publication_receipts",
+            &key,
+            saved.revision,
+            &json!({"fingerprint":fingerprint,"entry_id":first.id}),
+        )
+    })
+    .unwrap();
+    let before = db.last_sequence().unwrap();
+    assert_eq!(
+        Publications::publish(&mut db, &exchange, draft.clone())
+            .unwrap()
+            .id,
+        first.id
+    );
+    assert_eq!(db.last_sequence().unwrap(), before);
+    assert!(
+        Publications::publish(
+            &mut db,
+            &exchange,
+            PublicationInput {
+                body: "different".into(),
+                ..draft
+            }
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn graph_records_contradictions_and_bounds_causal_depth_without_losing_provenance() {
     use polymas_core::{communication::PublicationLink, knowledge::Relation};
     let mut db = Store::memory().unwrap();

@@ -92,6 +92,33 @@ struct Receipt {
 fn hash(value: &[u8]) -> String {
     format!("{:x}", Sha256::digest(value))
 }
+fn pre_links_fingerprint(
+    mode: CommunicationMode,
+    input: &PublicationInput,
+) -> Result<Option<String>> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Legacy<'a> {
+        key: &'a str,
+        title: &'a str,
+        body: &'a str,
+        slug: &'a Option<String>,
+        expected_revision: u32,
+    }
+    if !input.links.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(hash(&serde_json::to_vec(&(
+        mode,
+        Legacy {
+            key: &input.key,
+            title: &input.title,
+            body: &input.body,
+            slug: &input.slug,
+            expected_revision: input.expected_revision,
+        },
+    ))?)))
+}
 fn bounded(value: &str, max: usize, label: &str) -> Result<()> {
     require(
         !value.trim().is_empty() && value.len() <= max,
@@ -154,9 +181,10 @@ impl Publications {
             &input.key,
         ))?);
         let fingerprint = hash(&serde_json::to_vec(&(scope.mode, &input))?);
+        let legacy_fingerprint = pre_links_fingerprint(scope.mode, &input)?;
         db.transaction(|tx| {
             if let Some(old) = tx.get::<Receipt>("publication_receipts", &receipt_key)? {
-                if old.value.fingerprint != fingerprint { return Err(Error::Conflict("Ключ публикации уже использован иначе".into())); }
+                if old.value.fingerprint != fingerprint && Some(&old.value.fingerprint) != legacy_fingerprint.as_ref() { return Err(Error::Conflict("Ключ публикации уже использован иначе".into())); }
                 let entry = tx.get::<Publication>("publications", &old.value.entry_id)?.ok_or_else(|| Error::Storage("Публикация receipt не найдена".into()))?.value;
                 require(visible(&entry, &scope.readable_authors), "Доступ к публикации отозван")?;
                 return Ok(entry);
