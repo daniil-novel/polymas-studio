@@ -4,6 +4,7 @@ pub mod artifacts;
 pub mod backup;
 pub mod codex;
 pub mod connections;
+pub mod engine;
 pub mod error;
 pub mod knowledge;
 pub mod mcp_client;

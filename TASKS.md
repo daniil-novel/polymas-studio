@@ -22,6 +22,7 @@
   - [x] D12b. Backup/restore snapshot + blobs; переносимый экспорт конфигурации следует с workspace service.
 - [ ] D13. Фоновая служба и защищённое desktop-подключение.
   - [x] D13a. Workspace service, команды конфигурации и durable history.
+  - [x] D13b. Durable queue, снимки запуска, recovery и ручная сверка исхода.
 - [ ] D14. Desktop shell, навигация и настоящие сохранённые данные.
 - [ ] D15. Формы ролей и массового создания экземпляров.
 - [ ] D16. WebGL-граф, поиск, layout worker и доступный список.

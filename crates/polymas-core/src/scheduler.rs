@@ -4,7 +4,7 @@ use crate::topology::{Admission, Architecture, Target};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CompletionRule {
     #[default]
@@ -16,7 +16,7 @@ pub enum CompletionRule {
     Manual,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct TaskInput {
     pub title: String,
@@ -56,7 +56,7 @@ pub enum TaskState {
     Cancelled,
     Unknown,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Lease {
     pub epoch: u64,
@@ -65,7 +65,7 @@ pub struct Lease {
     pub heartbeat_at: i64,
     pub pid: Option<u32>,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: String,
@@ -86,7 +86,7 @@ pub struct Task {
     pub completed_at: Option<String>,
     pub artifact_ids: Vec<String>,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Run {
     pub id: String,
@@ -99,7 +99,7 @@ pub struct Run {
     pub accepted: bool,
     pub stopped: bool,
 }
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Scheduler {
     pub runs: Vec<Run>,
@@ -112,6 +112,85 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
+    pub fn load(db: &crate::storage::Store) -> Result<Self> {
+        let mut scheduler = db
+            .get::<Self>("scheduler", "metadata")?
+            .map(|s| s.value)
+            .unwrap_or_default();
+        scheduler.runs = db
+            .list::<Run>("runs", 100000)?
+            .into_iter()
+            .map(|s| s.value)
+            .collect();
+        scheduler.tasks = db
+            .list::<Task>("tasks", 100000)?
+            .into_iter()
+            .map(|s| s.value)
+            .collect();
+        scheduler
+            .runs
+            .sort_by(|a, b| a.created_at.cmp(&b.created_at).then(a.id.cmp(&b.id)));
+        scheduler
+            .tasks
+            .sort_by(|a, b| a.created_at.cmp(&b.created_at).then(a.id.cmp(&b.id)));
+        Ok(scheduler)
+    }
+    pub fn persist_delta(
+        &self,
+        before: &Self,
+        tx: &crate::storage::WriteTransaction<'_>,
+    ) -> Result<()> {
+        let previous_tasks: BTreeMap<_, _> = before.tasks.iter().map(|t| (&t.id, t)).collect();
+        let previous_runs: BTreeMap<_, _> = before.runs.iter().map(|r| (&r.id, r)).collect();
+        for task in &self.tasks {
+            if previous_tasks.get(&task.id).copied() == Some(task) {
+                continue;
+            }
+            let revision = tx
+                .get::<Task>("tasks", &task.id)?
+                .map(|s| s.revision)
+                .unwrap_or(0);
+            tx.put("tasks", &task.id, revision, task)?;
+            let previous = previous_tasks.get(&task.id).map(|t| t.state);
+            if previous != Some(task.state) {
+                tx.emit(crate::storage::EventInput::new("task.state_changed",serde_json::json!({"taskId":task.id,"state":task.state,"previousState":previous,"attempt":task.attempt,"epoch":task.lease.as_ref().map(|l| l.epoch)})).agent(&task.assignee).run(&task.run_id))?;
+            }
+        }
+        for run in &self.runs {
+            if previous_runs.get(&run.id).copied() == Some(run) {
+                continue;
+            }
+            let revision = tx
+                .get::<Run>("runs", &run.id)?
+                .map(|s| s.revision)
+                .unwrap_or(0);
+            tx.put("runs", &run.id, revision, run)?;
+        }
+        if self.epoch != before.epoch
+            || self.receipts != before.receipts
+            || self.paused != before.paused
+        {
+            let metadata = Self {
+                runs: vec![],
+                tasks: vec![],
+                paused: self.paused,
+                receipts: self.receipts.clone(),
+                epoch: self.epoch,
+            };
+            let revision = tx
+                .get::<Self>("scheduler", "metadata")?
+                .map(|s| s.revision)
+                .unwrap_or(0);
+            tx.put("scheduler", "metadata", revision, &metadata)?;
+            if self.paused != before.paused {
+                tx.emit(crate::storage::EventInput::new(
+                    "scheduler.pause_changed",
+                    serde_json::json!({"paused":self.paused}),
+                ))?;
+            }
+        }
+        Ok(())
+    }
     pub fn task(&self, id: &str) -> Result<&Task> {
         self.tasks
             .iter()
