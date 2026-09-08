@@ -41,11 +41,12 @@ pub struct AppState {
     allowed_origins: Arc<BTreeSet<String>>,
 }
 impl AppState {
-    pub fn new(engine: Engine, token: String, allowed_origins: Vec<String>) -> Result<Self> {
+    pub fn new(mut engine: Engine, token: String, allowed_origins: Vec<String>) -> Result<Self> {
         require(
             token.len() >= 32 && token.len() <= 256,
             "Control token должен содержать не менее 32 символов",
         )?;
+        polymas_core::sessions::SessionRegistry::migrate(&mut engine.workspace.db)?;
         Ok(Self {
             engine: Arc::new(Mutex::new(engine)),
             active: Arc::new(Mutex::new(Default::default())),

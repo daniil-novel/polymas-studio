@@ -7,6 +7,7 @@ use polymas_core::{
     process::ProcessEvent,
     registry::now,
     scheduler::Task,
+    sessions::SessionRegistry,
     storage::EventInput,
 };
 use serde::{Deserialize, Serialize};
@@ -73,6 +74,8 @@ struct AttemptContext {
     inbox_ids: Vec<String>,
     input_delivered: bool,
     created_at: String,
+    #[serde(default)]
+    session_id: Option<String>,
 }
 
 pub async fn drive_once(
@@ -101,19 +104,23 @@ pub async fn drive_once(
         handles.push(tokio::spawn(async move {
             let _cancel_on_drop = CancelOnDrop(cancel.clone());
             let id = task.id.clone();
-            let epoch = task
-                .lease
-                .as_ref()
-                .map(|l| l.epoch)
-                .ok_or_else(|| Error::Runtime("Нет lease".into()))?;
-            let result = execute_attempt(&state, &task, executor, receiver).await;
-            if let Err(error) = &result {
-                cancel.send(true).ok();
-                let mut engine = state.engine.lock().await;
-                if engine.scheduler.verify_lease(&id, epoch).is_ok() {
-                    engine.finish(&id, epoch, Err(error.to_string()))?;
+            let result = async {
+                let epoch = task
+                    .lease
+                    .as_ref()
+                    .map(|l| l.epoch)
+                    .ok_or_else(|| Error::Runtime("Нет lease".into()))?;
+                let result = execute_attempt(&state, &task, executor, receiver, &cancel).await;
+                if let Err(error) = &result {
+                    cancel.send(true).ok();
+                    let mut engine = state.engine.lock().await;
+                    if engine.scheduler.verify_lease(&id, epoch).is_ok() {
+                        engine.finish(&id, epoch, Err(error.to_string()))?;
+                    }
                 }
+                result
             }
+            .await;
             state.active.lock().await.remove(&id);
             result
         }));
@@ -168,8 +175,17 @@ async fn prepare(state: &AppState, task: &Task) -> Result<(CodexRequest, Attempt
     } else if task.new_session {
         None
     } else {
+        if runtime.session_id.is_some() {
+            require(
+                runtime.agent_id == task.assignee,
+                "Runtime session относится к другому экземпляру",
+            )?;
+        }
         runtime.session_id
     };
+    if let Some(session) = &session_id {
+        SessionRegistry::verify(&engine.workspace.db, session, &task.assignee)?;
+    }
     let inbox = bounded_inbox(engine.pending_context_messages(
         &task.id,
         chrono::Utc::now().timestamp(),
@@ -184,6 +200,7 @@ async fn prepare(state: &AppState, task: &Task) -> Result<(CodexRequest, Attempt
         inbox_ids: inbox.iter().map(|m| m.id.clone()).collect(),
         input_delivered: false,
         created_at: now(),
+        session_id: session_id.clone(),
     };
     let identity = serde_json::to_string(
         &json!({"agentId":task.assignee,"taskId":task.id,"runId":task.run_id,"attempt":task.attempt}),
@@ -226,6 +243,7 @@ async fn execute_attempt(
     task: &Task,
     executor: Arc<dyn Executor>,
     cancel: watch::Receiver<bool>,
+    cancel_sender: &watch::Sender<bool>,
 ) -> Result<()> {
     let (mut request, context) = prepare(state, task).await?;
     let launch = state.gateway_launch.read().await.clone();
@@ -247,12 +265,25 @@ async fn execute_attempt(
     let (sender, mut events) = mpsc::channel(128);
     let execution = executor.execute(request, sender, cancel);
     tokio::pin!(execution);
+    let mut recording_error = None;
     let result = loop {
         tokio::select! {
             result=&mut execution => break result,
-            Some(event)=events.recv()=> {record_event(state,task,&context,event).await?;}
+            Some(event)=events.recv()=> {
+                if recording_error.is_none()
+                    && let Err(error) = record_event(state,task,&context,event).await
+                {
+                    recording_error = Some(error);
+                    cancel_sender.send(true).ok();
+                }
+            }
         }
     };
+    // Event rejection must not drop a still-running process future. Drain its
+    // bounded channel until the executor confirms cancellation and reap.
+    if let Some(error) = recording_error {
+        return Err(error);
+    }
     while let Ok(event) = events.try_recv() {
         record_event(state, task, &context, event).await?;
     }
@@ -265,17 +296,16 @@ async fn execute_attempt(
                 uuid::Uuid::parse_str(&result.session_id).is_ok(),
                 "Некорректная сессия исполнителя",
             )?;
-            for record in engine
-                .workspace
-                .db
-                .list::<AgentRuntime>("agent_runtime", 5000)?
-            {
+            if let Some(expected) = &context.session_id {
                 require(
-                    record.value.agent_id == task.assignee
-                        || record.value.session_id.as_deref() != Some(&result.session_id),
-                    "Сессия уже принадлежит другому агенту",
+                    uuid::Uuid::parse_str(expected).ok()
+                        == uuid::Uuid::parse_str(&result.session_id).ok(),
+                    "Исполнитель изменил сессию продолжения",
                 )?;
             }
+            engine.workspace.db.transaction(|tx| {
+                SessionRegistry::register(tx, &result.session_id, &task.assignee)
+            })?;
             let stopping = engine.scheduler.task(&task.id)?.state
                 == polymas_core::scheduler::TaskState::Stopping;
             let wait = if stopping {
@@ -376,7 +406,50 @@ async fn record_event(
             )?;
         }
     }
+    let announced_session = if event.kind == "runtime.session"
+        || (event.kind == "runtime.event" && event.body["type"] == "thread.started")
+    {
+        Some(
+            event.body["thread_id"]
+                .as_str()
+                .ok_or_else(|| Error::Runtime("Исполнитель не указал UUID сессии".into()))?,
+        )
+    } else {
+        None
+    };
+    let pid = engine
+        .scheduler
+        .task(&task.id)?
+        .lease
+        .as_ref()
+        .and_then(|lease| lease.pid);
     engine.workspace.db.transaction(|tx| {
+        if let Some(session) = announced_session {
+            if let Some(expected) = &context.session_id {
+                require(
+                    uuid::Uuid::parse_str(expected).ok() == uuid::Uuid::parse_str(session).ok(),
+                    "Исполнитель изменил сессию продолжения",
+                )?;
+            }
+            SessionRegistry::register(tx, session, &task.assignee)?;
+            let runtime = AgentRuntime {
+                agent_id: task.assignee.clone(),
+                session_id: Some(session.into()),
+                pid,
+                task_id: Some(task.id.clone()),
+                usage: None,
+            };
+            let revision = tx
+                .get::<AgentRuntime>("agent_runtime", &task.assignee)?
+                .map(|s| s.revision)
+                .unwrap_or(0);
+            tx.put("agent_runtime", &task.assignee, revision, &runtime)?;
+            let revision = tx
+                .get::<AgentRuntime>("task_runtime", &task.id)?
+                .map(|s| s.revision)
+                .unwrap_or(0);
+            tx.put("task_runtime", &task.id, revision, &runtime)?;
+        }
         tx.emit(
             EventInput::new(
                 &event.kind,
