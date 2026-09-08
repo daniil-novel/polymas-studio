@@ -148,7 +148,23 @@ impl Engine {
         self.transition(|s| s.finish(task_id, epoch, result))
     }
     pub fn accept(&mut self, task_id: &str) -> Result<()> {
-        self.transition(|s| s.accept(task_id, true))
+        let mut candidate = self.scheduler.clone();
+        candidate.accept(task_id, true)?;
+        let task = candidate.task(task_id)?;
+        self.workspace.db.transaction(|tx| {
+            for id in &task.artifact_ids {
+                let stored = tx.get::<crate::artifacts::Artifact>("artifacts", id)?.ok_or_else(|| Error::Storage("Артефакт результата не найден".into()))?;
+                let mut artifact = stored.value;
+                require(artifact.task_id == task.id && artifact.agent_id == task.assignee && artifact.attempt == task.attempt && !artifact.partial, "Артефакт не принадлежит завершённой попытке этой задачи")?;
+                artifact.accepted = true;
+                tx.put("artifacts", id, stored.revision, &artifact)?;
+                tx.emit(EventInput::new("artifact.accepted", json!({"artifactId":id,"taskId":task.id,"attempt":task.attempt,"author":"local:owner"})).agent(&task.assignee).run(&task.run_id))?;
+            }
+            candidate.persist_delta(&self.scheduler, tx)?;
+            Ok(())
+        })?;
+        self.scheduler = candidate;
+        Ok(())
     }
     pub fn reject(&mut self, task_id: &str) -> Result<()> {
         self.transition(|s| s.accept(task_id, false))

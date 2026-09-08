@@ -105,7 +105,7 @@ async fn real_child_execution_updates_durable_pid_session_result_and_artifact() 
     for h in handles {
         h.await.unwrap().unwrap();
     }
-    let e = state.engine.lock().await;
+    let mut e = state.engine.lock().await;
     let t = e.scheduler.task(&run.task_ids[0]).unwrap();
     assert_eq!(t.state, TaskState::AwaitingAcceptance);
     assert_eq!(t.result.as_deref(), Some("Actual child result"));
@@ -124,5 +124,54 @@ async fn real_child_execution_updates_durable_pid_session_result_and_artifact() 
         events
             .iter()
             .any(|e| e.input.kind == "runtime.input_delivered")
+    );
+    let artifact_id = t.artifact_ids[0].clone();
+    let before = e
+        .workspace
+        .db
+        .get::<polymas_core::artifacts::Artifact>("artifacts", &artifact_id)
+        .unwrap()
+        .unwrap();
+    assert!(!before.value.accepted);
+    let cursor = e.workspace.db.last_sequence().unwrap();
+    e.scheduler
+        .task_mut(&run.task_ids[0])
+        .unwrap()
+        .artifact_ids
+        .push("missing-artifact".into());
+    assert!(e.accept(&run.task_ids[0]).is_err());
+    assert_eq!(
+        e.workspace.db.last_sequence().unwrap(),
+        cursor,
+        "failed acceptance must roll back artifact events too"
+    );
+    assert!(
+        !e.workspace
+            .db
+            .get::<polymas_core::artifacts::Artifact>("artifacts", &artifact_id)
+            .unwrap()
+            .unwrap()
+            .value
+            .accepted
+    );
+    assert_eq!(
+        e.scheduler.task(&run.task_ids[0]).unwrap().state,
+        TaskState::AwaitingAcceptance
+    );
+    e.scheduler
+        .task_mut(&run.task_ids[0])
+        .unwrap()
+        .artifact_ids
+        .pop();
+    e.accept(&run.task_ids[0]).unwrap();
+    let after = e
+        .workspace
+        .db
+        .get::<polymas_core::artifacts::Artifact>("artifacts", &artifact_id)
+        .unwrap()
+        .unwrap();
+    assert!(
+        after.value.accepted,
+        "accepted task and its result artifact must agree"
     );
 }
