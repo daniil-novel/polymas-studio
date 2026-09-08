@@ -40,6 +40,7 @@
   - [x] D14b. Проверенный native HTTP client для IPC; запуск службы и Tauri окно далее.
   - [x] D14c. Launcher отдельного daemon; закрытие handle сохраняет работу, явный shutdown выполняет drain. Persistent reconnect и Tauri далее.
   - [x] D14d. Сериализуемая запись службы и reconnect через vault с проверкой workspaceId; хранение профиля и Tauri окно далее.
+  - [x] D14e. Startup adoption и защита от потерянного launcher; durable profile и Tauri далее.
 - [ ] D15. Формы ролей и массового создания экземпляров.
   - [x] D15b. Форма архитектуры и холонов с сохранением через ревизии; ресурсные scaling rules далее в D20.
   - [x] D15a. Роль, новая версия, массовое создание, список экземпляров и stale-form guard; расширенные действия экземпляров далее.

@@ -1,5 +1,87 @@
 use polymas_desktop_host::service::RunningService;
 use serde_json::json;
+#[tokio::test]
+async fn service_startup_expires_without_a_durable_desktop_adoption() {
+    use tokio::io::AsyncBufReadExt;
+    let dir = tempfile::tempdir().unwrap();
+    let mut engine = polymas_core::engine::Engine::open(dir.path()).unwrap();
+    let role = engine
+        .configure(
+            1,
+            polymas_core::workspace::ConfigCommand::CreateRole {
+                draft: polymas_core::registry::RoleDraft {
+                    name: "Queued".into(),
+                    instruction: "Preserve pending work".into(),
+                    ..Default::default()
+                },
+            },
+        )
+        .unwrap();
+    engine
+        .configure(
+            2,
+            polymas_core::workspace::ConfigCommand::CreateAgents {
+                key: "one".into(),
+                request: polymas_core::registry::BatchRequest {
+                    role_id: role["id"].as_str().unwrap().into(),
+                    role_version: 1,
+                    count: 1,
+                    name_pattern: "Queued".into(),
+                },
+            },
+        )
+        .unwrap();
+    let run = engine
+        .submit(
+            "pending",
+            polymas_core::scheduler::TaskInput {
+                prompt: "Do not start before adoption".into(),
+                ..Default::default()
+            },
+            1,
+        )
+        .unwrap();
+    drop(engine);
+    let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_polymas-daemon"));
+    #[cfg(windows)]
+    command.creation_flags(0x08000000);
+    let mut child = command
+        .args([
+            "--workspace",
+            dir.path().to_str().unwrap(),
+            "--port",
+            "0",
+            "--adoption-timeout",
+            "2",
+        ])
+        .env(
+            "POLYMAS_CONTROL_TOKEN",
+            "startup-expiration-fixture-token-32",
+        )
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let mut reader = tokio::io::BufReader::new(child.stdout.take().unwrap());
+    let mut line = String::new();
+    reader.read_line(&mut line).await.unwrap();
+    assert!(
+        line.contains("ready"),
+        "service should announce an endpoint before waiting for adoption"
+    );
+    let status = tokio::time::timeout(std::time::Duration::from_secs(8), child.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(status.success(), "unadopted startup must stop cleanly");
+    let engine = polymas_core::engine::Engine::open(dir.path()).unwrap();
+    assert_eq!(
+        engine.scheduler.task(&run.task_ids[0]).unwrap().state,
+        polymas_core::scheduler::TaskState::Queued,
+        "an abandoned startup must preserve pending user work"
+    );
+}
 #[derive(Default)]
 struct MemoryVault(std::sync::Mutex<std::collections::BTreeMap<String, String>>);
 impl polymas_desktop_host::service::CredentialVault for MemoryVault {

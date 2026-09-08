@@ -6,4 +6,6 @@
 
 Tauri shell и отдельный daemon упаковываются совместно. Привязка к рабочей области, reconnect и политика закрытия реализуются следующими срезами; наличие transport crate само по себе не означает готовое desktop-приложение.
 
+Нативный startup использует `--adoption-timeout 30`. До подтверждения служба обслуживает control API, но не запускает задачи. Host сохраняет credential в OS vault и endpoint/reference в durable profile, затем отправляет authenticated adopt. Если host исчез до завершения протокола, служба закрывается по deadline, сохраняя старую очередь. Pending/adopted/expired меняются атомарно; поздний adopt не возрождает expired startup. Обычный явный daemon/dev запуск сохраняет прежнюю семантику.
+
 Проверенные источники: [Rust commands](https://v2.tauri.app/develop/calling-rust/), [Tauri sidecars](https://v2.tauri.app/develop/sidecar/). Используется нативный вызов; JavaScript shell plugin не выдаётся окну.

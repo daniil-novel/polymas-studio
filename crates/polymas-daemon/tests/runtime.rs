@@ -284,11 +284,24 @@ async fn real_child_execution_updates_durable_pid_session_result_and_artifact() 
     .unwrap();
     // This is a protocol fixture with a real OS process, not an OpenAI test.
     let options = RuntimeOptions::new(Arc::new(FixtureExecutor), 1).unwrap();
+    state.require_adoption();
+    assert!(
+        drive_once(&state, &options).await.unwrap().is_empty(),
+        "unadopted service must not launch user work"
+    );
+    state.adopt().unwrap();
     let handles = drive_once(&state, &options).await.unwrap();
     assert_eq!(handles.len(), 1);
     for h in handles {
         h.await.unwrap().unwrap();
     }
+    state.require_adoption();
+    assert!(state.expire_adoption());
+    assert!(
+        state.adopt().is_err(),
+        "expired startup cannot win a late adoption race"
+    );
+    assert!(!state.is_adopted());
     let mut e = state.engine.lock().await;
     let t = e.scheduler.task(&run.task_ids[0]).unwrap();
     assert_eq!(t.state, TaskState::AwaitingAcceptance);

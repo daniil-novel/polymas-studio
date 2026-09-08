@@ -36,6 +36,7 @@ pub struct AppState {
     pub shutdown: Arc<tokio::sync::Notify>,
     pub gateway_scopes: gateway::Scopes,
     pub gateway_launch: Arc<tokio::sync::RwLock<Option<gateway::Launch>>>,
+    adoption: Arc<std::sync::atomic::AtomicU8>,
     token: Arc<Secret>,
     allowed_origins: Arc<BTreeSet<String>>,
 }
@@ -53,9 +54,29 @@ impl AppState {
             shutdown: Arc::new(tokio::sync::Notify::new()),
             gateway_scopes: Default::default(),
             gateway_launch: Default::default(),
+            adoption: Arc::new(std::sync::atomic::AtomicU8::new(1)),
             token: Arc::new(Secret::new(token)?),
             allowed_origins: Arc::new(allowed_origins.into_iter().collect()),
         })
+    }
+    pub fn require_adoption(&self) {
+        self.adoption.store(0, std::sync::atomic::Ordering::SeqCst);
+    }
+    pub fn adopt(&self) -> Result<()> {
+        use std::sync::atomic::Ordering::SeqCst;
+        match self.adoption.compare_exchange(0, 1, SeqCst, SeqCst) {
+            Ok(_) | Err(1) => Ok(()),
+            _ => Err(Error::Denied(
+                "Срок подключения к запущенной службе истёк".into(),
+            )),
+        }
+    }
+    pub fn expire_adoption(&self) -> bool {
+        use std::sync::atomic::Ordering::SeqCst;
+        self.adoption.compare_exchange(0, 2, SeqCst, SeqCst).is_ok()
+    }
+    pub fn is_adopted(&self) -> bool {
+        self.adoption.load(std::sync::atomic::Ordering::SeqCst) == 1
     }
     pub async fn configure_gateway(&self, port: u16, executable: std::path::PathBuf) -> Result<()> {
         require(

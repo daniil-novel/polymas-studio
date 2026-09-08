@@ -190,6 +190,7 @@ async fn control(
 ) -> std::result::Result<Json<Value>, ApiError> {
     match action.action.as_str() {
         "pause" => state.engine.lock().await.pause(true)?,
+        "adopt" => state.adopt()?,
         "resume" => state.engine.lock().await.pause(false)?,
         "stop_all" => stop_all(&state).await?,
         "shutdown" => {

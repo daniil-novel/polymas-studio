@@ -32,6 +32,7 @@ async fn serve() -> Result<()> {
     let mut capacity = 1_usize;
     let mut codex = None;
     let mut dev = false;
+    let mut adoption_timeout = None;
     let mut index = 0;
     while index < args.len() {
         let key = &args[index];
@@ -54,6 +55,16 @@ async fn serve() -> Result<()> {
                 capacity = value
                     .parse()
                     .map_err(|_| Error::Validation("Некорректная capacity".into()))?
+            }
+            "--adoption-timeout" => {
+                let seconds = value
+                    .parse::<u64>()
+                    .map_err(|_| Error::Validation("Некорректный срок adoption".into()))?;
+                polymas_core::error::require(
+                    (1..=60).contains(&seconds),
+                    "Adoption timeout: 1–60 секунд",
+                )?;
+                adoption_timeout = Some(seconds);
             }
             "--codex" => codex = Some(PathBuf::from(value)),
             _ => return Err(Error::Validation(format!("Неизвестный параметр {key}"))),
@@ -79,6 +90,16 @@ async fn serve() -> Result<()> {
         origins.push("http://127.0.0.1:1420".into());
     }
     let state = AppState::new(Engine::open(&root)?, token, origins)?;
+    if let Some(seconds) = adoption_timeout {
+        state.require_adoption();
+        let pending = state.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(seconds)).await;
+            if pending.expire_adoption() {
+                pending.shutdown.notify_one();
+            }
+        });
+    }
     state
         .configure_gateway(actual_port, std::env::current_exe()?)
         .await?;
@@ -118,7 +139,9 @@ async fn serve() -> Result<()> {
     let shutdown_state = state.clone();
     let server = axum::serve(listener, router(state.clone())).with_graceful_shutdown(async move {
         tokio::select! {_=tokio::signal::ctrl_c()=>{},_=shutdown_state.shutdown.notified()=>{}}
-        let _ = run_api::stop_all(&shutdown_state).await;
+        if shutdown_state.is_adopted() {
+            let _ = run_api::stop_all(&shutdown_state).await;
+        }
         for _ in 0..100 {
             if shutdown_state.active.lock().await.is_empty() {
                 break;

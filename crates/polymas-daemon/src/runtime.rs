@@ -79,6 +79,9 @@ pub async fn drive_once(
     state: &AppState,
     options: &RuntimeOptions,
 ) -> Result<Vec<tokio::task::JoinHandle<Result<()>>>> {
+    if !state.is_adopted() {
+        return Ok(vec![]);
+    }
     let claims = {
         let mut engine = state.engine.lock().await;
         let timestamp = chrono::Utc::now().timestamp();

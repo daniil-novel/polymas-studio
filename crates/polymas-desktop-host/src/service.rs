@@ -86,6 +86,23 @@ impl RunningService {
         self.child.id()
     }
     pub async fn launch(executable: &Path, workspace: &Path, capacity: usize) -> Result<Self> {
+        Self::launch_inner(executable, workspace, capacity, false).await
+    }
+    /// Persist the vault reference and endpoint, then call /api/control adopt
+    /// within 30 seconds. Until then no user task can execute.
+    pub async fn launch_unadopted(
+        executable: &Path,
+        workspace: &Path,
+        capacity: usize,
+    ) -> Result<Self> {
+        Self::launch_inner(executable, workspace, capacity, true).await
+    }
+    async fn launch_inner(
+        executable: &Path,
+        workspace: &Path,
+        capacity: usize,
+        require_adoption: bool,
+    ) -> Result<Self> {
         require(
             executable.is_absolute()
                 && executable.is_file()
@@ -98,7 +115,7 @@ impl RunningService {
             uuid::Uuid::new_v4().simple(),
             uuid::Uuid::new_v4().simple()
         ))?;
-        let spec = ProcessSpec {
+        let mut spec = ProcessSpec {
             executable: executable.into(),
             args: vec![
                 "--workspace".into(),
@@ -116,6 +133,9 @@ impl RunningService {
             timeout_seconds: 20,
             environment: [("POLYMAS_CONTROL_TOKEN".into(), token.expose().to_owned())].into(),
         };
+        if require_adoption {
+            spec.args.extend(["--adoption-timeout".into(), "30".into()]);
+        }
         let mut command = command_for(&spec);
         command.stdin(Stdio::null()).kill_on_drop(false);
         let mut child = command.spawn()?;

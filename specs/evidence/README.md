@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D14e: RED отсутствующий adoption gate/CLI timeout; дополнительный RED expiry отменял старую queued задачу. GREEN неподтверждённый запуск не исполняет очередь, живой daemon объявляет порт и через 2 секунды закрывается, исходная queued задача остаётся queued, поздний adopt после expired отклонён. Четыре native_host, три runtime, четыре HTTP tests и clippy. Desktop должен сохранить vault reference + endpoint перед adopt; Tauri ещё не подключён.
+
 D14d: RED отсутствующие CredentialVault/ServiceRecord. GREEN serialize/deserialize сохраняет reconnect после drop host, JSON не содержит credential, неверный workspaceId и отсутствующий vault credential отклонены. Три native_host tests с настоящим daemon и in-memory vault, clippy пройдены. Реальный OS vault в этом сценарии не подменяется утверждением о проверке: он будет проверен при запуске нативной оболочки.
 
 D14c: RED отсутствующий service module. GREEN launcher запускает настоящий daemon на port=0, изменение workspace сохраняется после shutdown/reopen, второй daemon на том же workspace отклонён, удаление handle не останавливает службу, явный HTTP shutdown завершает её. Два native_host tests с реальными процессами и clippy пройдены; модель в этих тестах не вызывается.
