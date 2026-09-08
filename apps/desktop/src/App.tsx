@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Box,
@@ -41,6 +41,7 @@ import { stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
 import { useGraphPositions } from './graph/useGraphPositions';
+import { holonNavigation } from './graph/holons';
 import './styles.css';
 
 const defaultClient = createClient();
@@ -52,11 +53,17 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   const positions = useGraphPositions(snapshot, connected, data.command, data.refresh);
   const [page, setPage] = useState<Page>('graph');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [holonId, setHolonId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState('');
   const [architectureOpen, setArchitectureOpen] = useState(false);
   const [chatAgentId, setChatAgentId] = useState<string | null>(null);
+  const [chatHolonId, setChatHolonId] = useState<string | null>(null);
+  const closeComposer = () => {
+    setChatAgentId(null);
+    setChatHolonId(null);
+  };
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [returnRunId, setReturnRunId] = useState<string | null>(null);
   const [, tickClock] = useState(0);
@@ -67,6 +74,11 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   // Every incoming event uses current time; periodic renders also expire idle observations.
   const now = Date.now();
   const config = snapshot?.config.value;
+  const holons = useMemo(
+    () => holonNavigation(config?.architecture.holons ?? [], config?.registry.agents ?? []),
+    [config?.architecture.holons, config?.registry.agents],
+  );
+  const activeHolon = holons.find((h) => h.id === holonId);
   const agents = config?.registry.agents.filter((a) => a.status !== 'archived') ?? [];
   const selected = agents.find((a) => a.id === selectedId);
   const projection = config
@@ -174,17 +186,21 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
           ХОЛОНЫ <Layers3 size={13} />
         </div>
         <div className="holon-tree">
-          {config?.architecture.holons.map((h) => (
+          {holons.map((h) => (
             <button
               key={h.id}
+              aria-pressed={activeHolon?.id === h.id}
+              style={{ paddingLeft: Math.min(h.depth, 8) * 12 }}
               onClick={() => {
-                setQuery(h.members[0] ?? '');
-                setPage('agents');
+                setQuery('');
+                setSelectedId(null);
+                setHolonId(h.id);
+                setPage('graph');
               }}
             >
-              <ChevronDown size={13} />
+              <Layers3 size={13} />
               {h.name}
-              <span>{h.members.length}</span>
+              <span>{h.members.size}</span>
             </button>
           ))}
           {!config?.architecture.holons.length && (
@@ -276,16 +292,38 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                   Архитектура
                 </button>
               )}
+              {page === 'graph' && activeHolon && (
+                <button
+                  onClick={() => {
+                    setChatAgentId(null);
+                    setChatHolonId(activeHolon.id);
+                  }}
+                >
+                  <Plus size={16} /> Задача холону
+                </button>
+              )}
             </div>
             <div className={`content-row ${page === 'graph' ? 'graph-layout' : ''}`}>
               <section className={page === 'graph' ? 'graph-stage' : 'page-content'}>
                 {page === 'graph' && (
                   <>
                     <div className="graph-tabs">
-                      <button className="selected">
+                      <button
+                        className={!activeHolon ? 'selected' : ''}
+                        onClick={() => {
+                          setHolonId(null);
+                          setQuery('');
+                          setSelectedId(null);
+                        }}
+                      >
                         <Network size={14} />
-                        Агенты
+                        Все агенты
                       </button>
+                      {activeHolon && (
+                        <span className="graph-scope" title={activeHolon.name}>
+                          {activeHolon.name} · {activeHolon.members.size}
+                        </span>
+                      )}
                       <span className="small muted">
                         N = {agents.length} · C = {config?.architecture.maxConcurrency}
                       </span>
@@ -319,6 +357,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                             positions.canEdit ? (id) => void positions.move(id, null) : undefined
                           }
                           query={query}
+                          scope={activeHolon?.members}
                           groupLabels={Object.fromEntries([
                             ...snapshot.config.value.registry.roles.map((r) => [r.id, r.name]),
                             ...snapshot.config.value.architecture.holons.map((h) => [h.id, h.name]),
@@ -547,22 +586,23 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
           </>
         )}
       </main>
-      {snapshot && chatAgentId && (
-        <Modal label="Диалог с агентом" onClose={() => setChatAgentId(null)}>
+      {snapshot && (chatAgentId || chatHolonId) && (
+        <Modal label={chatHolonId ? 'Задача холону' : 'Диалог с агентом'} onClose={closeComposer}>
           <div className="chat-modal">
             <button
               className="icon-button chat-close"
               aria-label="Закрыть диалог"
-              onClick={() => setChatAgentId(null)}
+              onClick={closeComposer}
             >
               <X size={18} />
             </button>
             <TaskComposer
               snapshot={snapshot}
               command={data.command}
-              initialAgentId={chatAgentId}
+              initialAgentId={chatAgentId ?? undefined}
+              initialHolonId={chatHolonId ?? undefined}
               onStarted={() => {
-                setChatAgentId(null);
+                closeComposer();
                 setPage('tasks');
               }}
             />

@@ -14,9 +14,11 @@ interface Props {
   groupLabels: Record<string, string>;
   onMove?: (id: string, position: [number, number]) => void;
   onUnpin?: (id: string) => void;
+  scope?: Set<string>;
 }
 export function GraphView(props: Props) {
-  const { projection, pinned, selectedId, onSelect, query, groupLabels, onMove, onUnpin } = props;
+  const { projection, pinned, selectedId, onSelect, query, groupLabels, onMove, onUnpin, scope } =
+    props;
   const [mode, setMode] = useState<'graph' | 'list'>('graph');
   const [failure, setFailure] = useState('');
   const [activeOnly, setActiveOnly] = useState(false);
@@ -38,11 +40,12 @@ export function GraphView(props: Props) {
     const term = query.trim().toLocaleLowerCase();
     return projection.nodes.filter(
       (n) =>
+        (!scope || n.kind === 'memory' || scope.has(n.id)) &&
         (!activeOnly || n.active) &&
         (!neighbors || !selectedId || adjacent.has(n.id)) &&
         (!term || `${n.label} ${n.id}`.toLocaleLowerCase().includes(term)),
     );
-  }, [projection, activeOnly, neighbors, selectedId, query]);
+  }, [projection, activeOnly, neighbors, selectedId, query, scope]);
   const visible = useMemo(() => new Set(visibleNodes.map((n) => n.id)), [visibleNodes]);
   const visibleRef = useRef(visible);
   useEffect(() => {

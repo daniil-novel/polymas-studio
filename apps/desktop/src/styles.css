@@ -313,6 +313,18 @@ small {
   margin-left: auto;
   color: var(--muted);
 }
+.holon-tree button[aria-pressed='true'] {
+  background: #223833;
+  color: var(--mint);
+}
+.graph-scope {
+  color: var(--mint);
+  font-size: 12px;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sidebar-bottom {
   margin-top: auto;
   padding-top: 24px;
