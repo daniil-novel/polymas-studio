@@ -6,7 +6,7 @@ use axum::{
 };
 use polymas_core::{
     error::Error,
-    policy::{Approval, ApprovalPage, ApprovalQuery},
+    policy::{Approval, ApprovalLedger, ApprovalPage, ApprovalQuery, ApprovalState},
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -16,6 +16,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/approvals", get(list))
         .route("/api/approvals/{id}", get(detail))
         .route("/api/approvals/{id}/decision", post(decide))
+        .route("/api/approvals/{id}/reconcile", post(reconcile))
 }
 async fn list(
     State(state): State<AppState>,
@@ -47,14 +48,39 @@ async fn detail(
         .get::<Value>("approval_resources", &id)?
         .map(|s| s.value);
     let timestamp = chrono::Utc::now().timestamp();
+    let reconciliation = engine
+        .workspace
+        .db
+        .get::<Value>("approval_reconciliations", &id)?
+        .map(|s| s.value);
     let permission = engine.check_approval_decision(&approval.value, true, timestamp);
     let can_deny = engine
         .check_approval_decision(&approval.value, false, timestamp)
         .is_ok();
     Ok(Json(
-        json!({"approval":approval,"connection":connection,"canApprove":permission.is_ok(),"canDeny":can_deny,
+        json!({"approval":approval,"connection":connection,"reconciliation":reconciliation,"canApprove":permission.is_ok(),"canDeny":can_deny,
         "unavailableReason":permission.err().map(|e| polymas_core::process::redact(&e.to_string()))}),
     ))
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReconcileInput {
+    expected_revision: i64,
+    outcome: ApprovalState,
+    note: String,
+}
+async fn reconcile(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(input): Json<ReconcileInput>,
+) -> Result<Json<Approval>, ApiError> {
+    Ok(Json(ApprovalLedger::reconcile_unknown(
+        &mut state.engine.lock().await.workspace.db,
+        &id,
+        input.expected_revision,
+        input.outcome,
+        &input.note,
+    )?))
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

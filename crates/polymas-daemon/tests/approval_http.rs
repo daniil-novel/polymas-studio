@@ -10,6 +10,113 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 const TOKEN: &str = "approval-owner-fixture-token-32-characters";
 
+#[tokio::test]
+async fn only_the_owner_can_record_an_unknown_outcome_without_sending_a_new_call() {
+    use polymas_core::policy::{ApprovalLedger, ApprovalState};
+    let (_dir, mut engine, request) = fixture::setup();
+    let approval = engine
+        .request_approval(
+            "request",
+            request.clone(),
+            chrono::Utc::now().timestamp(),
+            60,
+        )
+        .unwrap();
+    engine
+        .park_approval(&request.task_id, request.origin_epoch, "Wait".into())
+        .unwrap();
+    engine
+        .decide_approval(
+            &approval.id,
+            1,
+            &approval.fingerprint,
+            true,
+            chrono::Utc::now().timestamp(),
+        )
+        .unwrap();
+    engine
+        .wake_approvals(chrono::Utc::now().timestamp())
+        .unwrap();
+    let task = engine
+        .claim(1, "local", chrono::Utc::now().timestamp())
+        .unwrap()
+        .remove(0);
+    engine
+        .consume_approval(
+            &task.id,
+            task.lease.as_ref().unwrap().epoch,
+            &approval.id,
+            chrono::Utc::now().timestamp(),
+        )
+        .unwrap();
+    ApprovalLedger::complete(
+        &mut engine.workspace.db,
+        &approval.id,
+        ApprovalState::Unknown,
+    )
+    .unwrap();
+    let state = AppState::new(engine, TOKEN.into(), vec![]).unwrap();
+    let grant = polymas_daemon::gateway::issue(&state, &task.id)
+        .await
+        .unwrap();
+    let path = format!("/api/approvals/{}/reconcile", approval.id);
+    let input = json!({"expectedRevision":4,"outcome":"succeeded","note":"Fixture server shows the expected document hash"});
+    assert_eq!(
+        call(&state, &path, Some(input.clone()), grant.token.expose())
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let mut invalid = input.clone();
+    invalid["outcome"] = json!("approved");
+    assert_eq!(
+        call(&state, &path, Some(invalid), TOKEN).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        call(&state, &path, Some(input.clone()), TOKEN).await.0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(&state, &path, Some(input), TOKEN).await.0,
+        StatusCode::OK
+    );
+    let (_, reviewed) = call(
+        &state,
+        &format!("/api/approvals/{}", approval.id),
+        None,
+        TOKEN,
+    )
+    .await;
+    assert_eq!(reviewed["reconciliation"]["author"], "local:owner");
+    assert_eq!(reviewed["reconciliation"]["outcome"], "succeeded");
+    let engine = state.engine.lock().await;
+    assert_eq!(
+        engine.scheduler.task(&task.id).unwrap().attempt,
+        task.attempt
+    );
+    assert_eq!(engine.scheduler.task(&task.id).unwrap().state, task.state);
+    let events = engine
+        .workspace
+        .db
+        .events(0, 100, Some(&task.run_id))
+        .unwrap();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|e| e.input.kind == "approval.execution_started")
+            .count(),
+        1
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|e| e.input.kind == "approval.reconciled")
+            .count(),
+        1
+    );
+}
+
 /// Manual browser QA uses an explicitly separate, new workspace with no real target.
 #[test]
 #[ignore = "requires POLYMAS_VISUAL_FIXTURE_DIR naming a new local directory"]
@@ -26,7 +133,7 @@ fn create_local_approval_review_fixture() {
         )
         .unwrap();
     request.arguments = json!({"document":"reports/architecture.md","title":"Архитектура агентов","text":"Каждый экземпляр сохраняет собственную сессию. Запись требует решения владельца."});
-    engine
+    let approval = engine
         .request_approval(
             "visual-fixture",
             request.clone(),
@@ -41,6 +148,23 @@ fn create_local_approval_review_fixture() {
             "Подготовлен отчёт; ожидается решение владельца.".into(),
         )
         .unwrap();
+    if std::env::var("POLYMAS_VISUAL_FIXTURE_STATE").as_deref() == Ok("unknown") {
+        let now = chrono::Utc::now().timestamp();
+        engine
+            .decide_approval(&approval.id, 1, &approval.fingerprint, true, now)
+            .unwrap();
+        engine.wake_approvals(now).unwrap();
+        let task = engine.claim(1, "local", now).unwrap().remove(0);
+        engine
+            .consume_approval(
+                &task.id,
+                task.lease.as_ref().unwrap().epoch,
+                &approval.id,
+                now,
+            )
+            .unwrap();
+        // Deliberate test data: no external call occurs. Reopen recovers the abandoned lease.
+    }
     engine.pause(true).unwrap();
     drop(engine);
     std::fs::create_dir_all(&target).unwrap();

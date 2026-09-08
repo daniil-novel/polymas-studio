@@ -5,6 +5,62 @@ import { ApprovalWorkspace } from '../../apps/desktop/src/approvals/ApprovalWork
 import { ApiClient, ApiError } from '../../apps/desktop/src/api';
 import type { Snapshot } from '../../apps/desktop/src/types';
 afterEach(cleanup);
+test('manual outcome reconciliation preserves the note across refresh and submits no execution command', async () => {
+  const { client, request } = setup();
+  const original = request.getMockImplementation()!;
+  let saved = false;
+  const note = 'Проверен документ и его контрольная сумма в источнике';
+  request.mockImplementation(async (path, body, signal) => {
+    if (body) {
+      saved = true;
+      return {};
+    }
+    if (path === '/api/approvals/one') {
+      const current = detail('one');
+      return {
+        ...current,
+        approval: {
+          ...current.approval,
+          value: { ...current.approval.value, state: saved ? 'succeeded' : 'unknown' },
+        },
+        canApprove: false,
+        canDeny: false,
+        reconciliation: saved
+          ? {
+              outcome: 'succeeded',
+              note,
+              author: 'local:owner',
+              observedAt: '2026-09-08T09:00:00Z',
+            }
+          : null,
+      };
+    }
+    return original(path, body, signal);
+  });
+  render(<ApprovalWorkspace client={client} snapshot={snapshot} connected />);
+  const outcome = await screen.findByRole('combobox', { name: 'Проверенный исход' });
+  expect(screen.getByRole('button', { name: 'Сохранить результат сверки' })).toHaveProperty(
+    'disabled',
+    true,
+  );
+  await userEvent.selectOptions(outcome, 'succeeded');
+  await userEvent.type(screen.getByRole('textbox', { name: 'Что вы проверили' }), note);
+  await userEvent.click(screen.getByRole('button', { name: 'Обновить' }));
+  await waitFor(() =>
+    expect(screen.getByRole('textbox', { name: 'Что вы проверили' })).toHaveProperty('value', note),
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Сохранить результат сверки' }));
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith('/api/approvals/one/reconcile', {
+      expectedRevision: 3,
+      outcome: 'succeeded',
+      note,
+    }),
+  );
+  expect(await screen.findByText('Результат сверки владельца')).toBeTruthy();
+  expect(screen.getByText(note)).toBeTruthy();
+  expect(request.mock.calls.filter(([, body]) => body)).toHaveLength(1);
+});
 test('a saved refusal is a normal historical decision, not an actionable error', async () => {
   const { client, request } = setup();
   const original = request.getMockImplementation()!;

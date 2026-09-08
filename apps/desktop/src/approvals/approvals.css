@@ -185,6 +185,51 @@
   border-radius: 7px;
   color: var(--mint);
 }
+.approval-reconcile {
+  border: 1px solid #f2c46d55;
+  border-radius: 8px;
+  background: #f2c46d06;
+  padding: 18px;
+  margin: 22px 0;
+}
+.approval-reconcile h3 {
+  margin-top: 0;
+  color: var(--warning);
+}
+.approval-reconcile p {
+  color: var(--secondary);
+  line-height: 1.6;
+}
+.approval-reconcile fieldset {
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.approval-reconcile textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.approval-reconcile button {
+  justify-self: end;
+}
+.approval-reconciliation-record {
+  padding: 14px;
+  margin: 20px 0;
+  border-left: 2px solid var(--mint);
+  background: var(--canvas);
+}
+.approval-reconciliation-record h3 {
+  margin-top: 0;
+}
+.approval-reconciliation-record p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.approval-reconciliation-record time {
+  color: var(--muted);
+  font-size: 12px;
+}
 @media (max-width: 1080px) {
   .approval-columns {
     grid-template-columns: 230px minmax(0, 1fr);

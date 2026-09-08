@@ -45,6 +45,12 @@ export interface Approval {
   };
 }
 export interface ApprovalDetail {
+  reconciliation?: {
+    outcome: 'succeeded' | 'failed';
+    note: string;
+    author: string;
+    observedAt: string;
+  } | null;
   approval: Stored<Approval>;
   connection: { name: string; transport: Connection['transport'] } | null;
   canApprove: boolean;

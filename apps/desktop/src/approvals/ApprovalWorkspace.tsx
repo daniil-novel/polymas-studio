@@ -10,6 +10,8 @@ import {
   type ApprovalSummary,
 } from './model';
 import './approvals.css';
+import { ReconciliationForm, type ReconciliationDraft } from './ReconciliationForm';
+const emptyDraft: ReconciliationDraft = { outcome: '', note: '' };
 
 const date = (seconds: number) => new Date(seconds * 1000).toLocaleString('ru');
 export function ApprovalWorkspace({
@@ -26,6 +28,7 @@ export function ApprovalWorkspace({
   const [selected, setSelected] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, ReconciliationDraft>>({});
   const inFlight = useRef(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -34,19 +37,21 @@ export function ApprovalWorkspace({
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  useEffect(() => {
-    if (busy || !connected) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState !== 'hidden') setRefresh((n) => n + 1);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [busy, connected]);
   const page = useRemote<{ items: ApprovalSummary[]; nextCursor: string | null }>(
     client,
     `/api/approvals?limit=30${filter ? `&state=${filter}` : ''}${cursors.length ? `&after=${encodeURIComponent(cursors.at(-1)!)}` : ''}`,
     refresh,
   );
   const currentId = selected ?? page.data?.items[0]?.id ?? null;
+  const draft = currentId ? (drafts[currentId] ?? emptyDraft) : emptyDraft;
+  const editing = Boolean(draft.note || draft.outcome);
+  useEffect(() => {
+    if (busy || !connected || editing) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== 'hidden') setRefresh((n) => n + 1);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [busy, connected, editing]);
   const agentName = (id: string) =>
     snapshot.config.value.registry.agents.find((a) => a.id === id)?.name ?? id;
   function resetSelection() {
@@ -57,24 +62,48 @@ export function ApprovalWorkspace({
   function changed() {
     setRefresh((n) => n + 1);
   }
-  async function decide(detail: ApprovalDetail, allow: boolean) {
+  function decide(detail: ApprovalDetail, allow: boolean) {
+    return save(
+      detail,
+      'decision',
+      {
+        expectedRevision: detail.approval.revision,
+        fingerprint: detail.approval.value.fingerprint,
+        allow,
+      },
+      allow
+        ? 'Разрешение сохранено. Агент продолжит работу, когда будет доступен слот.'
+        : 'Отказ сохранён. Агент получит решение в продолжении задачи.',
+    );
+  }
+  function reconcile(detail: ApprovalDetail, draft: ReconciliationDraft) {
+    return save(
+      detail,
+      'reconcile',
+      { expectedRevision: detail.approval.revision, outcome: draft.outcome, note: draft.note },
+      'Сверка сохранена. Вернитесь к задаче, чтобы проверить результат или продолжить работу.',
+    );
+  }
+  async function save(
+    detail: ApprovalDetail,
+    action: 'decision' | 'reconcile',
+    body: unknown,
+    message: string,
+  ) {
     if (inFlight.current || !connected) return;
     inFlight.current = true;
     setBusy(true);
     setError('');
     setNotice('');
-    const { revision, value } = detail.approval;
+    const { value } = detail.approval;
     try {
-      await client.request(`/api/approvals/${encodeURIComponent(value.id)}/decision`, {
-        expectedRevision: revision,
-        fingerprint: value.fingerprint,
-        allow,
+      await client.request(`/api/approvals/${encodeURIComponent(value.id)}/${action}`, body);
+      setNotice(message);
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[value.id];
+        return next;
       });
-      setNotice(
-        allow
-          ? 'Разрешение сохранено. Агент продолжит работу, когда будет доступен слот.'
-          : 'Отказ сохранён. Агент получит решение в продолжении задачи.',
-      );
     } catch (reason) {
       setError(
         `${reason instanceof Error ? reason.message : 'Ответ службы не получен'}. Обновите карточку, чтобы проверить сохранённое решение.`,
@@ -203,6 +232,9 @@ export function ApprovalWorkspace({
             connected={connected}
             clock={clock}
             onDecision={decide}
+            onReconcile={reconcile}
+            draft={draft}
+            onDraft={(value) => setDrafts((current) => ({ ...current, [currentId]: value }))}
           />
         ) : (
           <section className="approval-card approval-empty">
@@ -225,6 +257,9 @@ function ApprovalCard({
   connected,
   clock,
   onDecision,
+  onReconcile,
+  draft,
+  onDraft,
 }: {
   id: string;
   client: ApiClient;
@@ -234,6 +269,9 @@ function ApprovalCard({
   connected: boolean;
   clock: number;
   onDecision: (detail: ApprovalDetail, allow: boolean) => Promise<void>;
+  onReconcile: (detail: ApprovalDetail, draft: ReconciliationDraft) => Promise<void>;
+  draft: ReconciliationDraft;
+  onDraft: (draft: ReconciliationDraft) => void;
 }) {
   const remote = useRemote<ApprovalDetail>(
     client,
@@ -330,6 +368,21 @@ function ApprovalCard({
           >
             <Check size={16} /> Разрешить эту операцию
           </button>
+        </div>
+      )}
+      {value.state === 'unknown' && (
+        <ReconciliationForm
+          draft={draft}
+          disabled={busy || !connected}
+          onChange={onDraft}
+          onSubmit={() => void onReconcile(detail, draft)}
+        />
+      )}
+      {detail.reconciliation && (
+        <div className="approval-reconciliation-record">
+          <h3>Результат сверки владельца</h3>
+          <p>{detail.reconciliation.note}</p>
+          <time>{new Date(detail.reconciliation.observedAt).toLocaleString('ru')}</time>
         </div>
       )}
       <details className="approval-identifiers">
