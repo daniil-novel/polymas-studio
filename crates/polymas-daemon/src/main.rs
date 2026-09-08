@@ -79,6 +79,9 @@ async fn serve() -> Result<()> {
         origins.push("http://127.0.0.1:1420".into());
     }
     let state = AppState::new(Engine::open(&root)?, token, origins)?;
+    state
+        .configure_gateway(actual_port, std::env::current_exe()?)
+        .await?;
     println!(
         "{}",
         serde_json::json!({"type":"ready","port":actual_port,"workspaceId":state.engine.lock().await.workspace.config().value.id})

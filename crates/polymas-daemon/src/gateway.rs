@@ -35,6 +35,11 @@ pub struct Scope {
 }
 #[derive(Clone, Default)]
 pub struct Scopes(Arc<Mutex<BTreeMap<String, Scope>>>);
+#[derive(Clone)]
+pub struct Launch {
+    pub port: u16,
+    pub executable: std::path::PathBuf,
+}
 /// Dropping a turn (including cancellation/unwind) removes its capability.
 pub struct Grant {
     pub token: Secret,

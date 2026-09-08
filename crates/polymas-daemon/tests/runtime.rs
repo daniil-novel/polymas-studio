@@ -52,6 +52,134 @@ impl Executor for FixtureExecutor {
         })
     }
 }
+
+struct GatewayExecutor {
+    token: Arc<std::sync::Mutex<Option<String>>>,
+    port: u16,
+}
+impl Executor for GatewayExecutor {
+    fn execute(
+        &self,
+        request: CodexRequest,
+        sender: mpsc::Sender<ProcessEvent>,
+        cancel: watch::Receiver<bool>,
+    ) -> Execution {
+        let token_out = self.token.clone();
+        let port = self.port;
+        Box::pin(async move {
+            let launch = request
+                .gateway
+                .as_ref()
+                .expect("each configured attempt needs its trusted gateway");
+            assert_eq!(
+                launch.args,
+                vec!["--gateway-port".to_owned(), port.to_string()]
+            );
+            assert_eq!(launch.env_vars, vec!["POLYMAS_GATEWAY_TOKEN"]);
+            assert!(!request.environment.contains_key("POLYMAS_CONTROL_TOKEN"));
+            let token = request
+                .environment
+                .get("POLYMAS_GATEWAY_TOKEN")
+                .expect("scoped credential")
+                .clone();
+            let response = reqwest::Client::builder()
+                .no_proxy()
+                .build()
+                .unwrap()
+                .get(format!("http://127.0.0.1:{port}/gateway/context"))
+                .bearer_auth(&token)
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), reqwest::StatusCode::OK);
+            *token_out.lock().unwrap() = Some(token);
+            FixtureExecutor.execute(request, sender, cancel).await
+        })
+    }
+}
+#[tokio::test]
+async fn execution_injects_only_attempt_authority_and_revokes_it_after_process_completion() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut engine = Engine::open(dir.path()).unwrap();
+    let role = engine
+        .configure(
+            1,
+            ConfigCommand::CreateRole {
+                draft: RoleDraft {
+                    name: "Bridge test".into(),
+                    instruction: "Return a result".into(),
+                    ..Default::default()
+                },
+            },
+        )
+        .unwrap();
+    engine
+        .configure(
+            2,
+            ConfigCommand::CreateAgents {
+                key: "one".into(),
+                request: BatchRequest {
+                    role_id: role["id"].as_str().unwrap().into(),
+                    role_version: 1,
+                    count: 1,
+                    name_pattern: "Agent".into(),
+                },
+            },
+        )
+        .unwrap();
+    engine
+        .submit(
+            "run",
+            TaskInput {
+                prompt: "Run fixture".into(),
+                ..Default::default()
+            },
+            1,
+        )
+        .unwrap();
+    let state = AppState::new(
+        engine,
+        "test-runtime-control-token-32-characters".into(),
+        vec![],
+    )
+    .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    state
+        .configure_gateway(port, env!("CARGO_BIN_EXE_polymas-daemon").into())
+        .await
+        .unwrap();
+    let server_state = state.clone();
+    let service = tokio::spawn(async move {
+        axum::serve(listener, polymas_daemon::router(server_state))
+            .await
+            .unwrap();
+    });
+    let token = Arc::new(std::sync::Mutex::new(None));
+    let options = RuntimeOptions::new(
+        Arc::new(GatewayExecutor {
+            token: token.clone(),
+            port,
+        }),
+        1,
+    )
+    .unwrap();
+    for handle in drive_once(&state, &options).await.unwrap() {
+        handle.await.unwrap().unwrap();
+    }
+    let token = token.lock().unwrap().clone().unwrap();
+    let response = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .unwrap()
+        .get(format!("http://127.0.0.1:{port}/gateway/context"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
+    service.abort();
+}
 #[tokio::test]
 async fn real_child_execution_updates_durable_pid_session_result_and_artifact() {
     let dir = tempfile::tempdir().unwrap();

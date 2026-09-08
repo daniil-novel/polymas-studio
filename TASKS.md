@@ -19,6 +19,7 @@
   - [x] D10c. Отдельная авторизация gateway и отзыв attempt credentials; forwarding и подключение Codex следуют отдельно.
   - [x] D10d. Обнаружение инструментов и read forwarding; STDIO bridge, runtime wiring и write approvals далее.
   - [x] D10e. Настоящий STDIO bridge на rmcp; подключение к execution pipeline далее.
+  - [x] D10f. Runtime выдаёт отдельный gateway grant и отзывает его после попытки; actual Codex MCP smoke и write approvals далее.
 - [x] D11. Источники, утверждения, связи и происхождение знаний; UI/gateway следуют отдельно.
 - [ ] D12. Артефакты с hash, экспорт, backup и восстановление.
   - [x] D12a. Content-addressed артефакты, provenance и безопасный импорт.

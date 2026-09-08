@@ -33,6 +33,7 @@ pub struct AppState {
     pub runtime_status: Arc<tokio::sync::RwLock<run_api::RuntimeStatus>>,
     pub shutdown: Arc<tokio::sync::Notify>,
     pub gateway_scopes: gateway::Scopes,
+    pub gateway_launch: Arc<tokio::sync::RwLock<Option<gateway::Launch>>>,
     token: Arc<Secret>,
     allowed_origins: Arc<BTreeSet<String>>,
 }
@@ -49,9 +50,18 @@ impl AppState {
             runtime_status: Arc::new(tokio::sync::RwLock::new(Default::default())),
             shutdown: Arc::new(tokio::sync::Notify::new()),
             gateway_scopes: Default::default(),
+            gateway_launch: Default::default(),
             token: Arc::new(Secret::new(token)?),
             allowed_origins: Arc::new(allowed_origins.into_iter().collect()),
         })
+    }
+    pub async fn configure_gateway(&self, port: u16, executable: std::path::PathBuf) -> Result<()> {
+        require(
+            port > 0 && executable.is_absolute() && executable.is_file(),
+            "Gateway требует порт и абсолютный путь доверенного executable",
+        )?;
+        *self.gateway_launch.write().await = Some(gateway::Launch { port, executable });
+        Ok(())
     }
 }
 pub struct ApiError(pub Error);

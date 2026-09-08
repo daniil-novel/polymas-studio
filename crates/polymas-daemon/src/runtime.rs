@@ -197,7 +197,23 @@ async fn execute_attempt(
     executor: Arc<dyn Executor>,
     cancel: watch::Receiver<bool>,
 ) -> Result<()> {
-    let (request, context) = prepare(state, task).await?;
+    let (mut request, context) = prepare(state, task).await?;
+    let launch = state.gateway_launch.read().await.clone();
+    let _gateway_grant = if let Some(launch) = launch {
+        let grant = crate::gateway::issue(state, &task.id).await?;
+        request.gateway = Some(polymas_core::codex::McpLaunch {
+            command: launch.executable,
+            args: vec!["--gateway-port".into(), launch.port.to_string()],
+            env_vars: vec!["POLYMAS_GATEWAY_TOKEN".into()],
+        });
+        request.environment.insert(
+            "POLYMAS_GATEWAY_TOKEN".into(),
+            grant.token.expose().to_owned(),
+        );
+        Some(grant)
+    } else {
+        None
+    };
     let (sender, mut events) = mpsc::channel(128);
     let execution = executor.execute(request, sender, cancel);
     tokio::pin!(execution);
