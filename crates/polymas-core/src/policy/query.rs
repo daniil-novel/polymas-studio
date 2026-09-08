@@ -47,7 +47,7 @@ impl Store {
             'agentId',json_extract(document,'$.operation.agentId'),'taskId',json_extract(document,'$.operation.taskId'),
             'runId',json_extract(document,'$.operation.runId'),'connectionId',json_extract(document,'$.operation.connectionId'),
             'tool',json_extract(document,'$.operation.tool'),'namespace',json_extract(document,'$.operation.namespace'),
-            'epoch',json_extract(document,'$.operation.epoch'))
+            'epoch',json_extract(document,'$.operation.epoch'),'originEpoch',json_extract(document,'$.operation.originEpoch'))
             FROM entities WHERE collection='approvals' AND id>?1
             AND {state_clause}
             AND (?3 IS NULL OR json_extract(document,'$.operation.runId')=?3)

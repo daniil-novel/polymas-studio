@@ -61,27 +61,34 @@ test('manual outcome reconciliation preserves the note across refresh and submit
   expect(screen.getByText(note)).toBeTruthy();
   expect(request.mock.calls.filter(([, body]) => body)).toHaveLength(1);
 });
-test('a saved refusal is a normal historical decision, not an actionable error', async () => {
-  const { client, request } = setup();
-  const original = request.getMockImplementation()!;
-  request.mockImplementation(async (path, body, signal) => {
-    if (path === '/api/approvals/one') {
-      const saved = detail('one');
-      return {
-        ...saved,
-        approval: { ...saved.approval, value: { ...saved.approval.value, state: 'denied' } },
-        canApprove: false,
-        canDeny: false,
-        unavailableReason: 'Разрешение уже решено или истекло',
-      };
-    }
-    return original(path, body, signal);
-  });
-  render(<ApprovalWorkspace client={client} snapshot={snapshot} connected />);
-  expect(await screen.findByText(/Точный текст one/)).toBeTruthy();
-  expect(screen.queryByText('Разрешение уже решено или истекло')).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Разрешить эту операцию' })).toBeNull();
-});
+test.each([
+  ['denied', 'Отклонено'],
+  ['revoked', 'Отозвано'],
+])(
+  'a %s operation is a normal historical decision, not an actionable error',
+  async (state, label) => {
+    const { client, request } = setup();
+    const original = request.getMockImplementation()!;
+    request.mockImplementation(async (path, body, signal) => {
+      if (path === '/api/approvals/one') {
+        const saved = detail('one');
+        return {
+          ...saved,
+          approval: { ...saved.approval, value: { ...saved.approval.value, state } },
+          canApprove: false,
+          canDeny: false,
+          unavailableReason: 'Разрешение уже решено или истекло',
+        };
+      }
+      return original(path, body, signal);
+    });
+    render(<ApprovalWorkspace client={client} snapshot={snapshot} connected />);
+    expect(await screen.findByText(/Точный текст one/)).toBeTruthy();
+    expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Разрешение уже решено или истекло')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Разрешить эту операцию' })).toBeNull();
+  },
+);
 const snapshot = {
   config: { value: { registry: { agents: [{ id: 'agent', name: 'Исследователь 01' }] } } },
   runs: [{ id: 'run', title: 'Проверка источника' }],

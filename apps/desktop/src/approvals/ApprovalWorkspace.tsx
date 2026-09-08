@@ -378,6 +378,11 @@ function ApprovalCard({
           onSubmit={() => void onReconcile(detail, draft)}
         />
       )}
+      {value.state === 'revoked' && (
+        <p className="muted">
+          Попытка завершена или отменена. Это разрешение больше не допускает внешний вызов.
+        </p>
+      )}
       {detail.reconciliation && (
         <div className="approval-reconciliation-record">
           <h3>Результат сверки владельца</h3>

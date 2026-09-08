@@ -1,10 +1,19 @@
 import type { Connection, Stored } from '../types';
 export type ApprovalState =
-  'pending' | 'approved' | 'denied' | 'expired' | 'executing' | 'succeeded' | 'failed' | 'unknown';
+  | 'pending'
+  | 'approved'
+  | 'denied'
+  | 'revoked'
+  | 'expired'
+  | 'executing'
+  | 'succeeded'
+  | 'failed'
+  | 'unknown';
 export const approvalLabels: Record<ApprovalState, string> = {
   pending: 'Нужно решение',
   approved: 'Разрешено',
   denied: 'Отклонено',
+  revoked: 'Отозвано',
   expired: 'Срок истёк',
   executing: 'Выполняется',
   succeeded: 'Выполнено',

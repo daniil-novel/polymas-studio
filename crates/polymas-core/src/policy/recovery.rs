@@ -1,6 +1,17 @@
 use super::*;
 
 impl ApprovalLedger {
+    pub(crate) fn revoke_unused(db: &mut crate::storage::Store, id: &str) -> Result<()> {
+        db.transaction(|tx| {
+            let mut stored = tx.get::<Approval>("approvals", id)?.ok_or_else(||Error::NotFound("Разрешение не найдено".into()))?;
+            require(matches!(stored.value.state, ApprovalState::Pending | ApprovalState::Approved), "Операция уже имеет другой исход")?;
+            stored.value.state = ApprovalState::Revoked;
+            tx.put("approvals", id, stored.revision, &stored.value)?;
+            tx.emit(EventInput::new("approval.revoked", json!({"approvalId":id,"taskId":stored.value.operation.task_id,"reason":"execution_unavailable"}))
+                .agent(&stored.value.operation.agent_id).run(&stored.value.operation.run_id))?;
+            Ok(())
+        })
+    }
     /// Records the owner's observed outcome. It never sends another external call.
     pub fn reconcile_unknown(
         db: &mut crate::storage::Store,

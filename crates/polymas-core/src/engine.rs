@@ -185,6 +185,7 @@ impl Engine {
             scheduler,
         };
         engine.recover_inactive_operations()?;
+        engine.revoke_unused_approvals()?;
         Ok(engine)
     }
     pub fn configure(&mut self, revision: i64, command: ConfigCommand) -> Result<Value> {

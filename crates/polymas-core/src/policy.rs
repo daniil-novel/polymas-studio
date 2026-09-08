@@ -197,6 +197,7 @@ pub enum ApprovalState {
     Pending,
     Approved,
     Denied,
+    Revoked,
     Expired,
     Executing,
     Succeeded,

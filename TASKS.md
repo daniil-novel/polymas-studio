@@ -12,6 +12,7 @@
 - [x] D06. Очередь задач, зависимости, admission, lease и правила приёмки; durable service в D13.
 - [x] D07. Codex resolver, JSONL, отдельный процесс, явный resume и отмена.
   - [x] D07a. Неизменяемый владелец всех прошлых сессий, migration и runtime enforcement; отвергнутое событие не освобождает экземпляр до reap.
+  - [ ] D07b. Квалифицировать отдельный интерактивный Codex adapter для MCP write approvals: точное решение по thread/turn/item/args, deny для остальных действий, без blanket approval. Exec 0.144.1 отменил destructive MCP call после owner decision; реальная запись пока не прошла gate.
 - [x] D08. Надёжная маршрутизация сообщений и защита от циклов; gateway связывается в D10.
 - [x] D09. MCP-рецепты, stdio/HTTP, диагностика и секретное хранилище; расширенные integration tests в D22.
 - [ ] D10. Gateway: bindings, ограничения инструментов и approvals.
@@ -38,6 +39,7 @@
   - [x] D10u. Debug approval/operation не раскрывает аргументы и ресурс; regression проверяет вложенное содержимое без изменения сохраняемой операции.
   - [x] D10v. Gateway request/status: служба задаёт identity и резерв, 15-минутный срок, retry без продления, статус только origin/точному continuation; взаимоисключение с message wait. Исполнение внешнего вызова следующим срезом.
   - [x] D10w. Execute по одному approvalId: frozen args, проверка scope/credentials до consume, атомарный результат, без повторной отправки; cancel/revoke/partial error → unknown. Реальные STDIO/HTTP fixtures; actual Codex write и результат операции в owner UI далее.
+  - [x] D10x. Неиспользованные pending/approved автоматически отзываются при закрытии origin/continuation, отмене и recovery; активный запрос/очередь/исполнение сохраняются. UI показывает «Отозвано», история owner decision не стирается.
   - [x] D18c. Owner approvals API: страницы metadata, frozen target/точные аргументы, доступность решения, CAS/повтор; agent credential не допускается. UI и MCP инструменты далее.
   - [x] D18d. Экран подтверждений: фильтры/страницы, точные параметры, решение без подмены, guard при late response/disconnect; waiting_user в задачах/графе/replay. CU fixture 1600×1000 и 1280×800, отказ сохранён. Agent request/execute инструменты и actual Codex write smoke далее.
   - [x] D18e. Owner API/форма сверки unknown с проверенным исходом и заметкой, CAS/idempotency, история результата; черновик переживает обновление карточки. CU отдельного fixture, без внешнего вызова.

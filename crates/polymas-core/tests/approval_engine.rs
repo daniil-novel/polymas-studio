@@ -9,6 +9,109 @@ use polymas_core::{
 use serde_json::json;
 
 #[test]
+fn cancellation_and_restart_revoke_unused_approvals_without_resurrecting_the_task() {
+    use polymas_core::policy::ApprovalState;
+    for cancel in [true, false] {
+        let (dir, mut engine, request) = setup();
+        let approval = engine
+            .request_approval("request", request.clone(), 100, 60)
+            .unwrap();
+        if cancel {
+            engine
+                .park_approval(&request.task_id, request.origin_epoch, "Wait".into())
+                .unwrap();
+            engine.cancel_task(&request.task_id).unwrap();
+        }
+        drop(engine);
+        let mut engine = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            engine
+                .workspace
+                .db
+                .get::<Approval>("approvals", &approval.id)
+                .unwrap()
+                .unwrap()
+                .value
+                .state,
+            ApprovalState::Revoked
+        );
+        assert!(engine.wake_approvals(101).unwrap().is_empty());
+        assert!(engine.claim(1, "local", 102).unwrap().is_empty());
+    }
+}
+#[test]
+fn unused_approvals_close_when_their_origin_or_reserved_execution_can_no_longer_run() {
+    use polymas_core::policy::ApprovalState;
+    for finish_origin in [true, false] {
+        let (dir, mut engine, request) = setup();
+        let approval = engine
+            .request_approval("request", request.clone(), 100, 60)
+            .unwrap();
+        assert!(engine.revoke_unused_approvals().unwrap().is_empty());
+        let epoch = if finish_origin {
+            request.origin_epoch
+        } else {
+            engine
+                .park_approval(&request.task_id, request.origin_epoch, "Waiting".into())
+                .unwrap();
+            assert!(engine.revoke_unused_approvals().unwrap().is_empty());
+            engine
+                .decide_approval(&approval.id, 1, &approval.fingerprint, true, 101)
+                .unwrap();
+            engine.wake_approvals(101).unwrap();
+            assert!(engine.revoke_unused_approvals().unwrap().is_empty());
+            let epoch = engine.claim(1, "local", 102).unwrap()[0]
+                .lease
+                .as_ref()
+                .unwrap()
+                .epoch;
+            assert!(engine.revoke_unused_approvals().unwrap().is_empty());
+            epoch
+        };
+        engine
+            .finish(
+                &request.task_id,
+                epoch,
+                Ok("No external write occurred".into()),
+            )
+            .unwrap();
+        assert_eq!(
+            engine.revoke_unused_approvals().unwrap(),
+            vec![approval.id.clone()]
+        );
+        assert!(engine.revoke_unused_approvals().unwrap().is_empty());
+        assert_eq!(
+            engine
+                .workspace
+                .db
+                .get::<Approval>("approvals", &approval.id)
+                .unwrap()
+                .unwrap()
+                .value
+                .state,
+            ApprovalState::Revoked
+        );
+        assert!(
+            engine
+                .decide_approval(&approval.id, 1, &approval.fingerprint, true, 103)
+                .is_err()
+        );
+        drop(engine);
+        let engine = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            engine
+                .workspace
+                .db
+                .get::<Approval>("approvals", &approval.id)
+                .unwrap()
+                .unwrap()
+                .value
+                .state,
+            ApprovalState::Revoked
+        );
+    }
+}
+#[test]
 fn an_abandoned_external_execution_requires_owner_reconciliation_before_retry_or_acceptance() {
     use polymas_core::policy::ApprovalState;
     let (dir, mut engine, request) = setup();
