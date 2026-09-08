@@ -1,5 +1,7 @@
 # Проверки реализации
 
+Session ownership core: RED отсутствующий SessionRegistry; GREEN две regression проверки — старые и новые сессии остаются за одним агентом после reopen, metadata runtime.session/result_saved восстанавливается, чужой owner/unknown session отклонены, конфликт legacy полностью откатывается. Clippy пройден. Применение в execution pipeline следует отдельным срезом.
+
 Codex Debug review: RED обычный derived Debug содержал fixture prompt и credentials. GREEN восемь codex_contract tests и clippy; Debug показывает размеры/counts, sandbox и служебные пути, исключая текст задачи/аргументы/env values. Проверка не утверждает очистку сторонних provider logs.
 
 D25a: README сверён с существующими scripts/UI/runtime и фактической Tauri build. Проверены 50 локальных ссылок; инструкции отличают native от browser, real provider от fixtures и capacity=1 от целевого масштаба. Runtime behavior не меняется, искусственные unit tests для prose не добавлялись.
