@@ -58,6 +58,9 @@ pub struct WriteTransaction<'a> {
 }
 
 impl Store {
+    pub(crate) fn connection(&self) -> &Connection {
+        &self.connection
+    }
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -73,7 +76,7 @@ impl Store {
         connection.pragma_update(None, "journal_mode", "WAL")?;
         connection.pragma_update(None, "synchronous", "FULL")?;
         let version: u32 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
-        if version > 1 {
+        if version > 2 {
             return Err(Error::Storage(
                 "База создана более новой версией приложения".into(),
             ));
@@ -89,7 +92,15 @@ impl Store {
                 body TEXT NOT NULL CHECK(json_valid(body)));
             CREATE INDEX IF NOT EXISTS events_run_sequence ON events(run_id,sequence);
             CREATE INDEX IF NOT EXISTS events_agent_sequence ON events(agent_id,sequence);
-            PRAGMA user_version=1; COMMIT;")?;
+            CREATE TABLE IF NOT EXISTS messages (
+                id TEXT PRIMARY KEY, run_id TEXT NOT NULL, sender TEXT NOT NULL, recipient TEXT NOT NULL,
+                idempotency_key TEXT NOT NULL, fingerprint TEXT NOT NULL, correlation_id TEXT NOT NULL,
+                body_hash TEXT NOT NULL, state TEXT NOT NULL, expires_at INTEGER NOT NULL,
+                document TEXT NOT NULL CHECK(json_valid(document)), UNIQUE(run_id,sender,idempotency_key));
+            CREATE INDEX IF NOT EXISTS messages_inbox ON messages(recipient,state,expires_at);
+            CREATE INDEX IF NOT EXISTS messages_run ON messages(run_id);
+            CREATE INDEX IF NOT EXISTS messages_dedup ON messages(correlation_id,sender,recipient,body_hash);
+            PRAGMA user_version=2; COMMIT;")?;
         Ok(Self { connection })
     }
     pub fn transaction<T>(
@@ -214,6 +225,9 @@ fn list<T: DeserializeOwned>(
 }
 
 impl WriteTransaction<'_> {
+    pub(crate) fn connection(&self) -> &Connection {
+        &self.transaction
+    }
     pub fn get<T: DeserializeOwned>(
         &self,
         collection: &str,

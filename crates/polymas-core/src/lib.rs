@@ -2,6 +2,7 @@
 pub const SCHEMA_VERSION: u32 = 1;
 pub mod codex;
 pub mod error;
+pub mod messages;
 pub mod process;
 pub mod registry;
 pub mod scheduler;
