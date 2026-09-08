@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D14h: RED отсутствующий DesktopLifecycle и лишнее поле control token при native failure. GREEN три frontend regression: закрытие только после выбора, точные behavior/remember, ошибка остановки сохраняет dialog, startup failure предлагает reconnect. Полная UI suite 29 tests/typecheck/lint/build. Native events/invoke в этих тестах имитируются; Tauri wiring и визуальная проверка следуют отдельно.
+
 D14g: RED отсутствующий Preferences. GREEN первый запуск требует выбора, background/stop сохраняются после reopen, reset возвращает вопрос, неизвестный enum отклонён. Три desktop-host tests и clippy пройдены. Это persistence, не ещё проверенное поведение окна.
 
 Native drain: RED отсутствующий stop; дополнительный RED на Windows ERROR_LOCK_VIOLATION исправлен сопоставлением fs2 lock_contended_error. GREEN после stop другая Workspace сразу получает exclusive lock. Пять native_host tests с настоящими процессами и clippy пройдены.

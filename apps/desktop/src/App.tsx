@@ -23,6 +23,8 @@ import {
   X,
 } from 'lucide-react';
 import { ApiClient, createClient } from './api';
+import { isTauri } from '@tauri-apps/api/core';
+import { DesktopLifecycle } from './DesktopLifecycle';
 import { useWorkspace } from './useWorkspace';
 import { RoleEditor } from './RoleEditor';
 import { ArchitectureEditor } from './ArchitectureEditor';
@@ -81,6 +83,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   ];
   return (
     <div className="app-shell">
+      <DesktopLifecycle />
       <header className="topbar">
         <a
           className="brand"
@@ -191,7 +194,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
             <Hexagon size={40} />
             <h1>PolyMAS Studio</h1>
             <p>Подключение к локальной службе редактора</p>
-            {error && (
+            {error && !isTauri() && (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();

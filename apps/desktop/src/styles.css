@@ -787,3 +787,34 @@ button svg {
     transition: none !important;
   }
 }
+.desktop-notice {
+  position: fixed;
+  z-index: 100;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 40px));
+  padding: 20px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 12px;
+  box-shadow: 0 16px 60px #0008;
+}
+.desktop-close {
+  width: min(580px, calc(100vw - 64px));
+  padding: 30px;
+}
+.desktop-close h2 {
+  margin: 12px 0;
+  font-size: 24px;
+}
+.desktop-close p {
+  line-height: 1.6;
+}
+.desktop-close footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
