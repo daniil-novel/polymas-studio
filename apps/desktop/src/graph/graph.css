@@ -54,6 +54,20 @@
   height: 100%;
   pointer-events: none;
 }
+.graph-position-feedback {
+  position: absolute;
+  z-index: 4;
+  top: 96px;
+  left: 18px;
+  max-width: min(550px, calc(100% - 36px));
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
 .graph-minimap {
   position: absolute;
   width: 144px;

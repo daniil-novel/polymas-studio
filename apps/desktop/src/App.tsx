@@ -40,6 +40,7 @@ import { ApprovalWorkspace } from './approvals/ApprovalWorkspace';
 import { stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
+import { useGraphPositions } from './graph/useGraphPositions';
 import './styles.css';
 
 const defaultClient = createClient();
@@ -48,6 +49,7 @@ type Page =
 export function App({ client = defaultClient }: { client?: ApiClient }) {
   const data = useWorkspace(client);
   const { snapshot, events, connected, error } = data;
+  const positions = useGraphPositions(snapshot, connected, data.command, data.refresh);
   const [page, setPage] = useState<Page>('graph');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -307,9 +309,15 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                       projection && (
                         <GraphView
                           projection={projection}
-                          pinned={snapshot.config.value.architecture.positions}
+                          pinned={positions.pins}
                           selectedId={selectedId}
                           onSelect={setSelectedId}
+                          onMove={
+                            positions.canEdit ? (id, xy) => void positions.move(id, xy) : undefined
+                          }
+                          onUnpin={
+                            positions.canEdit ? (id) => void positions.move(id, null) : undefined
+                          }
                           query={query}
                           groupLabels={Object.fromEntries([
                             ...snapshot.config.value.registry.roles.map((r) => [r.id, r.name]),
@@ -317,6 +325,23 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                           ])}
                         />
                       )
+                    )}
+                    {(positions.pending || positions.error) && (
+                      <div className="graph-position-feedback" role="status">
+                        {positions.pending ? (
+                          'Сохраняем положение…'
+                        ) : (
+                          <>
+                            <span>{positions.error}. Положение ещё не подтверждено.</span>
+                            <button
+                              disabled={positions.refreshing}
+                              onClick={() => void positions.reconcile()}
+                            >
+                              Обновить положение узлов
+                            </button>
+                          </>
+                        )}
+                      </div>
                     )}
                     <div className="graph-legend">
                       <span>
@@ -423,6 +448,12 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                         <code>{selected.id.slice(-12)}</code>
                       </div>
                       <dl>
+                        <dt>На графе</dt>
+                        <dd>
+                          {snapshot.config.value.architecture.positions[selected.id]
+                            ? 'Положение закреплено'
+                            : 'Автоматическое положение'}
+                        </dd>
                         <dt>Роль</dt>
                         <dd>
                           {

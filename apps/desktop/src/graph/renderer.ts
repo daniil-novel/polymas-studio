@@ -25,7 +25,18 @@ export class GraphRenderer {
   private worker: Worker;
   private version = 0;
   private layoutKey = '';
+  private layoutPending = false;
   private positions: Positions = {};
+  private pinned: Positions = {};
+  private canMove = false;
+  private drag: {
+    id: string;
+    start: [number, number];
+    original: [number, number];
+    offset: [number, number];
+    moved: boolean;
+  } | null = null;
+  private suppressClickUntil = 0;
   private projection: GraphProjection = { nodes: [], edges: [], impulses: [] };
   private selected: string | null = null;
   private visible = new Set<string>();
@@ -38,6 +49,7 @@ export class GraphRenderer {
   constructor(
     container: HTMLElement,
     private onSelect: (id: string | null) => void,
+    private onMove?: (id: string, position: [number, number]) => void,
   ) {
     this.sigma = new Sigma(this.graph, container, {
       labelColor: { color: '#E7EDF5' },
@@ -89,11 +101,69 @@ export class GraphRenderer {
     this.worker = new Worker(new URL('./layout.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (event: MessageEvent<{ version: number; positions: Positions }>) => {
       if (this.disposed || event.data.version !== this.version) return;
+      this.layoutPending = false;
       this.positions = event.data.positions;
       this.apply();
     };
-    this.sigma.on('clickNode', ({ node }) => this.onSelect(node));
-    this.sigma.on('clickStage', () => this.onSelect(null));
+    this.sigma.on('clickNode', ({ node }) => {
+      if (performance.now() > this.suppressClickUntil) this.onSelect(node);
+    });
+    this.sigma.on('clickStage', () => {
+      if (performance.now() > this.suppressClickUntil) this.onSelect(null);
+    });
+    this.sigma.on('downNode', ({ node, event }) => {
+      if (
+        !this.canMove ||
+        this.layoutPending ||
+        !this.positions[node] ||
+        !('button' in event.original) ||
+        event.original.button !== 0
+      )
+        return;
+      const original = this.positions[node];
+      const point = this.sigma.viewportToGraph(event);
+      this.drag = {
+        id: node,
+        start: [event.x, event.y],
+        original: [...original],
+        offset: [original[0] - point.x, original[1] - point.y],
+        moved: false,
+      };
+      this.sigma.getCamera().disable();
+      event.preventSigmaDefault();
+      this.onSelect(node);
+    });
+    this.sigma.getMouseCaptor().on('mousemovebody', (event) => {
+      const drag = this.drag;
+      if (!drag) return;
+      event.preventSigmaDefault();
+      event.original.preventDefault();
+      event.original.stopPropagation();
+      if (!drag.moved && Math.hypot(event.x - drag.start[0], event.y - drag.start[1]) < 4) return;
+      if (!drag.moved) {
+        this.sigma.setCustomBBox(this.sigma.getCustomBBox() ?? this.sigma.getBBox());
+        drag.moved = true;
+      }
+      const point = this.sigma.viewportToGraph(event);
+      this.positions[drag.id] = [
+        Math.max(-999999, Math.min(999999, point.x + drag.offset[0])),
+        Math.max(-999999, Math.min(999999, point.y + drag.offset[1])),
+      ];
+      this.apply();
+    });
+    this.sigma.getMouseCaptor().on('mouseup', () => {
+      const drag = this.drag;
+      if (!drag) return;
+      const position = this.positions[drag.id];
+      this.drag = null;
+      this.sigma.getCamera().enable();
+      if (drag.moved) {
+        this.suppressClickUntil = performance.now() + 100;
+        this.onMove?.(drag.id, position);
+      }
+    });
+    window.addEventListener('blur', this.cancelDrag);
+    window.addEventListener('keydown', this.escapeDrag);
     this.sigma.on('beforeRender', () => this.labels.reset());
     this.sigma.on('afterRender', () => this.draw());
     this.tick();
@@ -104,22 +174,42 @@ export class GraphRenderer {
     selected: string | null,
     visible: Set<string>,
     groupLabels: Record<string, string>,
+    canMove = false,
   ) {
     const previous = this.projection;
     this.projection = projection;
     this.selected = selected;
     this.visible = visible;
     this.groupLabels = groupLabels;
+    this.canMove = canMove && projection.frameTime === undefined;
+    if (!this.canMove || (this.drag && !visible.has(this.drag.id))) this.cancelDrag();
     const key = JSON.stringify([projection.nodes.map((n) => [n.id, n.group]), pinned]);
     if (key !== this.layoutKey) {
+      this.cancelDrag();
       this.layoutKey = key;
+      // Removing a pin must not preserve that same position as an automatic one.
+      const automatic = { ...this.positions };
+      for (const id of Object.keys(this.pinned)) if (!pinned[id]) delete automatic[id];
+      this.pinned = { ...pinned };
+      this.layoutPending = true;
       this.worker.postMessage({
         version: ++this.version,
         nodes: projection.nodes,
-        pinned: stablePositions(previous.nodes, projection.nodes, this.positions, pinned),
+        pinned: stablePositions(previous.nodes, projection.nodes, automatic, pinned),
       });
     } else this.apply();
   }
+  private cancelDrag = () => {
+    if (!this.drag) return;
+    this.positions[this.drag.id] = this.drag.original;
+    this.drag = null;
+    this.suppressClickUntil = performance.now() + 100;
+    this.sigma.getCamera().enable();
+    this.apply();
+  };
+  private escapeDrag = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') this.cancelDrag();
+  };
   private apply() {
     const ids = new Set(this.projection.nodes.map((n) => n.id));
     for (const node of this.graph.nodes()) if (!ids.has(node)) this.graph.dropNode(node);
@@ -370,9 +460,10 @@ export class GraphRenderer {
     this.animation = requestAnimationFrame(this.tick);
   };
   zoom(direction: number) {
-    if (direction === 0)
+    if (direction === 0) {
+      this.sigma.setCustomBBox(null);
       void this.sigma.getCamera().animatedReset({ duration: this.reduced.matches ? 0 : 180 });
-    else if (direction > 0) void this.sigma.getCamera().animatedZoom({ duration: 180 });
+    } else if (direction > 0) void this.sigma.getCamera().animatedZoom({ duration: 180 });
     else void this.sigma.getCamera().animatedUnzoom({ duration: 180 });
   }
   focus(id: string) {
@@ -386,6 +477,8 @@ export class GraphRenderer {
         );
   }
   dispose() {
+    window.removeEventListener('blur', this.cancelDrag);
+    window.removeEventListener('keydown', this.escapeDrag);
     this.disposed = true;
     cancelAnimationFrame(this.animation);
     this.worker.terminate();

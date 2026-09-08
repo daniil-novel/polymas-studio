@@ -68,7 +68,7 @@ Pop-Location
 | Исполнение | Codex exec/JSONL, процесс на активную попытку, fencing, отмена, recovery, task-scoped session resume |
 | Общение | Peer discovery, send/inbox/ack, bounded wait, пробуждение сообщением или deadline; delegation ещё не завершён |
 | MCP | Files, stdio/HTTP discovery/probe, bindings, allowlist, read gateway; write approvals/OAuth/rotation ещё не соединены полностью |
-| Граф | WebGL, реальные состояния и доставки, поиск, layout worker, миникарта, доступный список; drag/pinning/LOD ещё дополняются |
+| Граф | WebGL, реальные состояния и доставки, поиск, layout worker, миникарта, доступный список, drag/pinning; агрегация/LOD и расширенная клавиатурная навигация ещё дополняются |
 | Сохранение | SQLite/WAL, история ревизий и событий, артефакты с hash, backup/restore в core; часть пользовательских экранов ещё впереди |
 | Desktop | Нативный bridge, OS vault, отдельный daemon, reconnect, tray, close preference; native visual gate открыт |
 | Масштаб | Fixtures 1000–5000 определений; реальный C=1000, длительная нагрузка и remote workers не подтверждены |

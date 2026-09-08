@@ -12,9 +12,11 @@ interface Props {
   onSelect: (id: string | null) => void;
   query: string;
   groupLabels: Record<string, string>;
+  onMove?: (id: string, position: [number, number]) => void;
+  onUnpin?: (id: string) => void;
 }
 export function GraphView(props: Props) {
-  const { projection, pinned, selectedId, onSelect, query, groupLabels } = props;
+  const { projection, pinned, selectedId, onSelect, query, groupLabels, onMove, onUnpin } = props;
   const [mode, setMode] = useState<'graph' | 'list'>('graph');
   const [failure, setFailure] = useState('');
   const [activeOnly, setActiveOnly] = useState(false);
@@ -57,7 +59,11 @@ export function GraphView(props: Props) {
     void import('./renderer')
       .then(({ GraphRenderer: Renderer }) => {
         if (cancelled) return;
-        renderer.current = new Renderer(host, (id) => latest.current.onSelect(id));
+        renderer.current = new Renderer(
+          host,
+          (id) => latest.current.onSelect(id),
+          (id, position) => latest.current.onMove?.(id, position),
+        );
         const current = latest.current;
         renderer.current.update(
           current.projection,
@@ -65,6 +71,7 @@ export function GraphView(props: Props) {
           current.selectedId,
           visibleRef.current,
           current.groupLabels,
+          !!current.onMove,
         );
       })
       .catch(() => {
@@ -77,8 +84,8 @@ export function GraphView(props: Props) {
     };
   }, [mode]);
   useEffect(() => {
-    renderer.current?.update(projection, pinned, selectedId, visible, groupLabels);
-  }, [projection, pinned, selectedId, visible, groupLabels]);
+    renderer.current?.update(projection, pinned, selectedId, visible, groupLabels, !!onMove);
+  }, [projection, pinned, selectedId, visible, groupLabels, onMove]);
   const list = visibleNodes.filter((n) => n.kind === 'agent');
   const start = Math.min(Math.max(0, Math.floor(scrollTop / 54) - 4), Math.max(0, list.length - 1));
   return (
@@ -112,6 +119,9 @@ export function GraphView(props: Props) {
         <span className="small muted">
           {list.length} из {projection.nodes.filter((n) => n.kind === 'agent').length}
         </span>
+        {selectedId && pinned[selectedId] && onUnpin && (
+          <button onClick={() => onUnpin(selectedId)}>Снять закрепление</button>
+        )}
       </div>
       {mode === 'graph' ? (
         <>
