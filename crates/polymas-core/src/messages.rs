@@ -190,6 +190,10 @@ impl Router {
         timestamp: i64,
     ) -> Result<Message> {
         require(
+            architecture.communication_mode == crate::topology::CommunicationMode::Direct,
+            "Выбранный режим использует публикации вместо адресных сообщений",
+        )?;
+        require(
             !key.is_empty() && key.len() <= 128 && !run_id.is_empty(),
             "Некорректный ключ сообщения",
         )?;

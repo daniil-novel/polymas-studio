@@ -327,6 +327,10 @@
           "minimum": 1,
           "maximum": 32
         },
+        "communicationMode": {
+          "enum": ["direct", "blackboard", "wiki", "graph"],
+          "default": "direct"
+        },
         "maxMessagesPerRun": {
           "type": "integer",
           "minimum": 1,

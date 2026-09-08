@@ -22,9 +22,20 @@ pub enum Admission {
     StartAll,
 }
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CommunicationMode {
+    #[default]
+    Direct,
+    Blackboard,
+    Wiki,
+    Graph,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct Architecture {
+    pub communication_mode: CommunicationMode,
     pub preset: Preset,
     pub max_concurrency: usize,
     pub admission: Admission,
@@ -41,6 +52,7 @@ pub struct Architecture {
 impl Default for Architecture {
     fn default() -> Self {
         Self {
+            communication_mode: CommunicationMode::Direct,
             preset: Preset::Network,
             max_concurrency: 1,
             admission: Admission::QueueAllowed,

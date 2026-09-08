@@ -57,6 +57,7 @@
     }
   ],
   "architecture": {
+    "communicationMode": "direct",
     "preset": "network",
     "maxConcurrency": 1,
     "admission": "queue_allowed",
