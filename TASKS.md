@@ -27,6 +27,7 @@
   - [x] D13d. Execution pipeline: процесс, событие, inbox receipt, session и artifact; daemon entrypoint далее.
   - [x] D13e. Daemon entrypoint и управление задачами; два реальных Codex turn через HTTP проверены.
 - [ ] D14. Desktop shell, навигация и настоящие сохранённые данные.
+  - [x] D14a. React shell с реальным HTTP API; Tauri launcher и native IPC следуют отдельно.
 - [ ] D15. Формы ролей и массового создания экземпляров.
 - [ ] D16. WebGL-граф, поиск, layout worker и доступный список.
 - [ ] D17. Задачи, чат, результаты, управление выполнением.

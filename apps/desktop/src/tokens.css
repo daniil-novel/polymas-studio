@@ -1,0 +1,15 @@
+:root {
+  color-scheme: dark;
+  --canvas: #101319;
+  --panel: #181d25;
+  --raised: #202733;
+  --border: #2b3442;
+  --text: #e7edf5;
+  --secondary: #a7b3c4;
+  --muted: #8c99ac;
+  --mint: #6de0b3;
+  --violet: #a699f0;
+  --warning: #f2c46d;
+  --error: #ff8585;
+  --idle: #6f7d93;
+}

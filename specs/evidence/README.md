@@ -30,5 +30,6 @@
 | D07d follow-up | Проверка после ed8cb82 выявила FAILED broken-pipe: Windows Tokio shutdown не flush-ит буфер | Явный flush ожидает OS write и возвращает broken-pipe; все 5 process scenarios | Исправление отдельным коммитом, не переписанной историей |
 | D13d | `runtime` отсутствует, E0432 | Реальный Python process через execution pipeline: PID, JSONL, stdin receipt, UUID session, результат и hash artifact сохранены | Protocol fixture, не OpenAI inference; реальный Codex end-to-end следует отдельно |
 | D13e | `/api/runs` возвращал 404; readiness/control regression FAILED | HTTP tests; `smoke_service.py --allow-provider`: реальный Codex 0.144.1 / ChatGPT, PID 28760 → 29520, точный resume, 2 artifacts, 2 принятые задачи | 2 коротких turn без инструментов; не concurrency/soak gate |
+| D14a | App/API imports отсутствовали, Vitest FAILED | UI не выдумывает агентов/активность при empty registry; unauthorized state видим; TS/lint/4 tests/build | Визуальная сверка и полноценные формы следуют отдельными срезами |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.
