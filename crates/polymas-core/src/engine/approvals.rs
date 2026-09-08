@@ -4,6 +4,7 @@ use crate::registry::AgentStatus;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 mod lifecycle;
+mod recovery;
 
 fn resource_hash(connection: &crate::connections::Connection, namespace: &str) -> Result<String> {
     Ok(format!(

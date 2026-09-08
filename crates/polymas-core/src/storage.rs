@@ -100,6 +100,7 @@ impl Store {
                 body TEXT NOT NULL CHECK(json_valid(body)));
             CREATE INDEX IF NOT EXISTS events_run_sequence ON events(run_id,sequence);
             CREATE INDEX IF NOT EXISTS events_agent_sequence ON events(agent_id,sequence);
+            CREATE INDEX IF NOT EXISTS approvals_state_page ON entities(json_extract(document,'$.state'),id) WHERE collection='approvals';
             CREATE TABLE IF NOT EXISTS messages (
                 id TEXT PRIMARY KEY, run_id TEXT NOT NULL, sender TEXT NOT NULL, recipient TEXT NOT NULL,
                 idempotency_key TEXT NOT NULL, fingerprint TEXT NOT NULL, correlation_id TEXT NOT NULL,

@@ -180,10 +180,12 @@ impl Engine {
         workspace
             .db
             .transaction(|tx| scheduler.persist_delta(&before, tx))?;
-        Ok(Self {
+        let mut engine = Self {
             workspace,
             scheduler,
-        })
+        };
+        engine.recover_inactive_operations()?;
+        Ok(engine)
     }
     pub fn configure(&mut self, revision: i64, command: ConfigCommand) -> Result<Value> {
         if let ConfigCommand::ArchiveAgent { agent_id } = &command {
@@ -309,6 +311,7 @@ impl Engine {
         self.transition(|s| s.finish(task_id, epoch, result))
     }
     pub fn accept(&mut self, task_id: &str) -> Result<()> {
+        self.require_resolved_operations(task_id)?;
         let mut candidate = self.scheduler.clone();
         candidate.accept(task_id, true)?;
         let task = candidate.task(task_id)?;
@@ -348,6 +351,9 @@ impl Engine {
     /// Only the local owner may reconcile an unknown external outcome. The
     /// daemon must verify process ownership/reaping before allowing this call.
     pub fn reconcile(&mut self, task_id: &str, retry: bool, note: &str) -> Result<()> {
+        if retry {
+            self.require_resolved_operations(task_id)?;
+        }
         require(
             !note.trim().is_empty() && note.len() <= 10000,
             "Укажите результат сверки процессов и внешних действий",

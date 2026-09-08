@@ -34,6 +34,7 @@
   - [x] D10q. Engine атомарно сохраняет reservation/approval/receipt; сам задаёт identity, future epoch, connection revision и resource hash, проверяет live∩pinned write scope. Runtime/gateway/UI далее.
   - [x] D10r. Durable owner decision/CAS retry, park/restart/wake/expiry и одноразовое consume по execution index; повторная проверка области и текущего lease. HTTP/runtime/gateway/UI далее.
   - [x] D10s. Runtime после успешного reap сохраняет partial и waiting_user; решение/expiry будит reserved turn той же task session, контекст содержит approval ID. Проверено дочерним fixture process; owner API/UI и gateway tools далее.
+  - [x] D10t. Потерянный executing lease превращает внешний исход в unknown; до явной сверки запрещены retry/accept задачи. Sweep использует индекс состояния и metadata; owner reconciliation в core, его UI/API далее.
   - [x] D18c. Owner approvals API: страницы metadata, frozen target/точные аргументы, доступность решения, CAS/повтор; agent credential не допускается. UI и MCP инструменты далее.
   - [x] D18d. Экран подтверждений: фильтры/страницы, точные параметры, решение без подмены, guard при late response/disconnect; waiting_user в задачах/графе/replay. CU fixture 1600×1000 и 1280×800, отказ сохранён. Agent request/execute инструменты и actual Codex write smoke далее.
 - [x] D11. Источники, утверждения, связи и происхождение знаний; UI/gateway следуют отдельно.

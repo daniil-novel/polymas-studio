@@ -9,6 +9,139 @@ use polymas_core::{
 use serde_json::json;
 
 #[test]
+fn an_abandoned_external_execution_requires_owner_reconciliation_before_retry_or_acceptance() {
+    use polymas_core::policy::ApprovalState;
+    let (dir, mut engine, request) = setup();
+    let approval = engine
+        .request_approval("request", request.clone(), 100, 30)
+        .unwrap();
+    engine
+        .park_approval(&request.task_id, request.origin_epoch, "Wait".into())
+        .unwrap();
+    engine
+        .decide_approval(&approval.id, 1, &approval.fingerprint, true, 101)
+        .unwrap();
+    engine.wake_approvals(101).unwrap();
+    let epoch = engine.claim(1, "local", 102).unwrap()[0]
+        .lease
+        .as_ref()
+        .unwrap()
+        .epoch;
+    engine
+        .consume_approval(&request.task_id, epoch, &approval.id, 102)
+        .unwrap();
+    drop(engine);
+    let mut engine = Engine::open(dir.path()).unwrap();
+    let unknown = engine
+        .workspace
+        .db
+        .get::<Approval>("approvals", &approval.id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(unknown.value.state, ApprovalState::Unknown);
+    assert!(
+        engine
+            .consume_approval(&request.task_id, epoch, &approval.id, 103)
+            .is_err()
+    );
+    assert!(
+        engine
+            .reconcile(&request.task_id, true, "Please retry the task")
+            .is_err()
+    );
+    assert!(
+        ApprovalLedger::reconcile_unknown(
+            &mut engine.workspace.db,
+            &approval.id,
+            unknown.revision,
+            ApprovalState::Approved,
+            "Not a valid outcome"
+        )
+        .is_err()
+    );
+    assert!(
+        ApprovalLedger::reconcile_unknown(
+            &mut engine.workspace.db,
+            &approval.id,
+            unknown.revision,
+            ApprovalState::Failed,
+            ""
+        )
+        .is_err()
+    );
+    ApprovalLedger::reconcile_unknown(
+        &mut engine.workspace.db,
+        &approval.id,
+        unknown.revision,
+        ApprovalState::Failed,
+        "Fixture server confirms no write occurred",
+    )
+    .unwrap();
+    engine
+        .reconcile(&request.task_id, true, "External outcome verified")
+        .unwrap();
+    let next = engine.claim(1, "local", 104).unwrap().remove(0);
+    assert!(next.lease.as_ref().unwrap().epoch > epoch);
+    engine
+        .finish(
+            &request.task_id,
+            next.lease.unwrap().epoch,
+            Ok("Verified result".into()),
+        )
+        .unwrap();
+    engine.accept(&request.task_id).unwrap();
+}
+
+#[test]
+fn an_unresolved_call_blocks_acceptance_even_after_a_model_reports_success() {
+    use polymas_core::policy::ApprovalState;
+    let (_dir, mut engine, request) = setup();
+    let approval = engine
+        .request_approval("request", request.clone(), 100, 30)
+        .unwrap();
+    engine
+        .park_approval(&request.task_id, request.origin_epoch, "Wait".into())
+        .unwrap();
+    engine
+        .decide_approval(&approval.id, 1, &approval.fingerprint, true, 101)
+        .unwrap();
+    engine.wake_approvals(101).unwrap();
+    let epoch = engine.claim(1, "local", 102).unwrap()[0]
+        .lease
+        .as_ref()
+        .unwrap()
+        .epoch;
+    engine
+        .consume_approval(&request.task_id, epoch, &approval.id, 102)
+        .unwrap();
+    assert!(engine.recover_inactive_operations().unwrap().is_empty());
+    engine
+        .finish(&request.task_id, epoch, Ok("Model claims success".into()))
+        .unwrap();
+    assert!(engine.accept(&request.task_id).is_err());
+    assert_eq!(
+        engine.recover_inactive_operations().unwrap(),
+        vec![approval.id.clone()]
+    );
+    assert!(engine.accept(&request.task_id).is_err());
+    let stored = engine
+        .workspace
+        .db
+        .get::<Approval>("approvals", &approval.id)
+        .unwrap()
+        .unwrap();
+    ApprovalLedger::reconcile_unknown(
+        &mut engine.workspace.db,
+        &approval.id,
+        stored.revision,
+        ApprovalState::Succeeded,
+        "Fixture server confirms the expected document hash",
+    )
+    .unwrap();
+    engine.accept(&request.task_id).unwrap();
+}
+
+#[test]
 fn owner_decision_resumes_only_the_reserved_turn_and_execution_consumes_once() {
     let (dir, mut engine, request) = setup();
     let approval = engine

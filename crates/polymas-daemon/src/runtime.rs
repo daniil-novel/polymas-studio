@@ -88,6 +88,7 @@ pub async fn drive_once(
     let claims = {
         let mut engine = state.engine.lock().await;
         let timestamp = chrono::Utc::now().timestamp();
+        engine.recover_inactive_operations()?;
         engine.wake_waiting(timestamp)?;
         engine.wake_approvals(timestamp)?;
         engine.claim(options.capacity, "local", timestamp)?
