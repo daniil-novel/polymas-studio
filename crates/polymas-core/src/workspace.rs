@@ -58,6 +58,10 @@ pub enum ConfigCommand {
     SetArchitecture {
         architecture: Architecture,
     },
+    SetNodePosition {
+        node_id: String,
+        position: Option<[f32; 2]>,
+    },
     SetBindings {
         bindings: Vec<Binding>,
     },
@@ -73,6 +77,7 @@ impl ConfigCommand {
             Self::RenameAgent { .. } => "agent.renamed",
             Self::ArchiveAgent { .. } => "agent.archived",
             Self::SetArchitecture { .. } => "architecture.changed",
+            Self::SetNodePosition { .. } => "graph.position_changed",
             Self::SetBindings { .. } => "bindings.changed",
         }
     }
@@ -272,6 +277,26 @@ impl Workspace {
             ConfigCommand::SetArchitecture { architecture } => {
                 candidate.architecture = architecture;
                 json!({})
+            }
+            ConfigCommand::SetNodePosition { node_id, position } => {
+                let is_agent = candidate
+                    .registry
+                    .agents
+                    .iter()
+                    .any(|agent| agent.id == node_id && agent.status != AgentStatus::Archived);
+                let is_memory = candidate.architecture.memory_enabled
+                    && candidate
+                        .architecture
+                        .memory_connection_id
+                        .as_ref()
+                        .is_some_and(|connection| node_id == format!("memory:{connection}"));
+                require(is_agent || is_memory, "Узел графа больше не существует")?;
+                if let Some(xy) = position {
+                    candidate.architecture.positions.insert(node_id.clone(), xy);
+                } else {
+                    candidate.architecture.positions.remove(&node_id);
+                }
+                json!({"nodeId":node_id,"position":position})
             }
             ConfigCommand::SetBindings { bindings } => {
                 require(bindings.len() <= 25000, "Слишком много bindings")?;
