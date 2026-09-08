@@ -93,6 +93,14 @@ pub struct Task {
     pub resume_note: Option<String>,
     #[serde(default)]
     pub approval_wait: Option<ApprovalWait>,
+    #[serde(default)]
+    pub continuation: Option<ReservedContinuation>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReservedContinuation {
+    pub origin_epoch: u64,
+    pub epoch: u64,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -326,6 +334,7 @@ impl Scheduler {
                     waiting: None,
                     resume_note: None,
                     approval_wait: None,
+                    continuation: None,
                 })
             })
             .collect::<Result<_>>()?;
@@ -376,6 +385,19 @@ impl Scheduler {
             .map(|t| t.assignee.clone())
             .collect();
         let mut remaining = capacity.saturating_sub(busy.len());
+        // An owner wait serializes this instance's context, without consuming a
+        // process slot. The reserved task also takes precedence after it wakes.
+        let mut suspended = BTreeMap::new();
+        for task in &self.tasks {
+            if (task.continuation.is_some() || task.state == TaskState::WaitingUser)
+                && let Some(previous) = suspended.insert(task.assignee.clone(), task.id.clone())
+                && previous != task.id
+            {
+                return Err(Error::Storage(
+                    "У агента несколько ожидающих продолжений".into(),
+                ));
+            }
+        }
         let accepted: HashSet<_> = self
             .tasks
             .iter()
@@ -401,6 +423,9 @@ impl Scheduler {
             }
             let task = &self.tasks[i];
             if busy.contains(&task.assignee)
+                || suspended
+                    .get(&task.assignee)
+                    .is_some_and(|owner| owner != &task.id)
                 || !task.dependencies.iter().all(|d| accepted.contains(d))
             {
                 continue;
@@ -426,21 +451,36 @@ impl Scheduler {
                 if queued.len() > remaining
                     || queued.iter().any(|t| {
                         busy.contains(&t.assignee)
+                            || suspended
+                                .get(&t.assignee)
+                                .is_some_and(|owner| owner != &t.id)
                             || !t.dependencies.iter().all(|d| accepted.contains(d))
                     })
                 {
                     continue;
                 }
             }
-            self.epoch = self
-                .epoch
-                .checked_add(1)
-                .ok_or_else(|| Error::Capacity("Переполнение epoch".into()))?;
+            let epoch = if let Some(ticket) = &task.continuation {
+                require(
+                    ticket.origin_epoch > 0
+                        && ticket.origin_epoch < ticket.epoch
+                        && ticket.epoch <= self.epoch,
+                    "Некорректное резервирование продолжения",
+                )?;
+                ticket.epoch
+            } else {
+                self.epoch = self
+                    .epoch
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Capacity("Переполнение epoch".into()))?;
+                self.epoch
+            };
             let task = &mut self.tasks[i];
+            task.continuation = None;
             task.state = TaskState::Running;
             task.attempt += 1;
             task.lease = Some(Lease {
-                epoch: self.epoch,
+                epoch,
                 worker_id: worker_id.into(),
                 acquired_at: timestamp,
                 heartbeat_at: timestamp,
@@ -508,7 +548,37 @@ impl Scheduler {
             }
         }
         t.completed_at = Some(now());
+        t.continuation = None;
         Ok(())
+    }
+    /// Reserve only a fencing number. No OS process or capacity reservation is created.
+    pub fn reserve_approval_continuation(
+        &mut self,
+        task_id: &str,
+        origin_epoch: u64,
+    ) -> Result<ReservedContinuation> {
+        let task = self.verify_lease(task_id, origin_epoch)?;
+        require(
+            task.state == TaskState::Running && task.attempt < task.role.draft.max_turns,
+            "Нет доступного продолжения для разрешения",
+        )?;
+        if let Some(ticket) = &task.continuation {
+            require(
+                ticket.origin_epoch == origin_epoch,
+                "Продолжение относится к другой попытке",
+            )?;
+            return Ok(ticket.clone());
+        }
+        self.epoch = self
+            .epoch
+            .checked_add(1)
+            .ok_or_else(|| Error::Capacity("Переполнение epoch".into()))?;
+        let ticket = ReservedContinuation {
+            origin_epoch,
+            epoch: self.epoch,
+        };
+        self.task_mut(task_id)?.continuation = Some(ticket.clone());
+        Ok(ticket)
     }
     /// Called only after the supervisor reaped a successful yielding process.
     pub fn park(
@@ -524,7 +594,9 @@ impl Scheduler {
         require(summary.len() <= 65536, "Сводка ожидания превышает 64 КиБ")?;
         let task = self.task_mut(task_id)?;
         require(
-            task.state == TaskState::Running && task.attempt < task.role.draft.max_turns,
+            task.state == TaskState::Running
+                && task.attempt < task.role.draft.max_turns
+                && task.continuation.is_none(),
             "Ожидание невозможно после остановки или исчерпания turn budget",
         )?;
         task.state = TaskState::Waiting;
@@ -657,8 +729,10 @@ impl Scheduler {
                     t.state = TaskState::Cancelled;
                     t.waiting = None;
                     t.approval_wait = None;
+                    t.continuation = None;
                 } else if t.state == TaskState::Running {
                     t.state = TaskState::Stopping;
+                    t.continuation = None;
                 }
             }
         }
@@ -687,9 +761,13 @@ impl Scheduler {
                 t.state = TaskState::Cancelled;
                 t.waiting = None;
                 t.approval_wait = None;
+                t.continuation = None;
                 t.completed_at = Some(now());
             }
-            TaskState::Running => t.state = TaskState::Stopping,
+            TaskState::Running => {
+                t.state = TaskState::Stopping;
+                t.continuation = None;
+            }
             _ => {}
         }
         Ok(())
@@ -711,6 +789,7 @@ impl Scheduler {
         for task in &mut self.tasks {
             if matches!(task.state, TaskState::Running | TaskState::Stopping) {
                 task.state = TaskState::Unknown;
+                task.continuation = None;
                 task.error=Some("Служба перезапущена; исход попытки неизвестен. Сверьте процессы и внешние действия перед повтором.".into());
             }
         }

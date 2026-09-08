@@ -369,6 +369,7 @@ impl Engine {
             TaskState::Cancelled
         };
         task.lease = None;
+        task.continuation = None;
         task.completed_at = None;
         task.error = None;
         if retry {

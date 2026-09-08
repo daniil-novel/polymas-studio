@@ -38,6 +38,80 @@ fn input() -> TaskInput {
     }
 }
 #[test]
+fn a_reserved_approval_turn_keeps_agent_order_without_reserving_a_process_slot() {
+    let (r, a) = setup(2, 1);
+    let mut s = Scheduler::default();
+    s.submit("approval", &r, &a, 1, input(), 1).unwrap();
+    let first = s.claim_ready(1, "local", 100).unwrap().remove(0);
+    let origin = first.lease.unwrap().epoch;
+    let reserved = s.reserve_approval_continuation(&first.id, origin).unwrap();
+    assert!(reserved.epoch > origin);
+    assert_eq!(
+        s.reserve_approval_continuation(&first.id, origin).unwrap(),
+        reserved
+    );
+    let mut overtaking = input();
+    overtaking.target = Target::Agent {
+        id: first.assignee.clone(),
+    };
+    overtaking.priority = 50;
+    let other_run = s.submit("same-agent", &r, &a, 1, overtaking, 1).unwrap();
+    s.park_approval(&first.id, origin, "approval-1", "Wait".into())
+        .unwrap();
+    let mut db = polymas_core::storage::Store::memory().unwrap();
+    db.transaction(|tx| s.persist_delta(&Scheduler::default(), tx))
+        .unwrap();
+    s = Scheduler::load(&db).unwrap();
+    s.recover_after_crash();
+    assert_eq!(
+        s.task(&first.id).unwrap().continuation,
+        Some(reserved.clone())
+    );
+    let second = s.claim_ready(1, "local", 101).unwrap().remove(0);
+    assert_ne!(second.assignee, first.assignee);
+    assert!(second.lease.as_ref().unwrap().epoch > reserved.epoch);
+    s.wake_approval(&first.id, "approval-1", "Decision received".into())
+        .unwrap();
+    s.finish(&second.id, second.lease.unwrap().epoch, Ok("done".into()))
+        .unwrap();
+    let resumed = s.claim_ready(1, "local", 102).unwrap().remove(0);
+    assert_eq!(resumed.id, first.id);
+    assert_eq!(resumed.lease.as_ref().unwrap().epoch, reserved.epoch);
+    assert!(resumed.continuation.is_none());
+    s.finish(&resumed.id, reserved.epoch, Ok("done".into()))
+        .unwrap();
+    let after = s.claim_ready(1, "local", 103).unwrap().remove(0);
+    assert_eq!(after.run_id, other_run.id);
+    assert!(after.lease.as_ref().unwrap().epoch > reserved.epoch);
+    let obsolete = s
+        .reserve_approval_continuation(&after.id, after.lease.unwrap().epoch)
+        .unwrap();
+    s.recover_after_crash();
+    assert!(s.task(&after.id).unwrap().continuation.is_none());
+    assert_eq!(s.task(&after.id).unwrap().state, TaskState::Unknown);
+    assert!(obsolete.epoch > reserved.epoch);
+}
+#[test]
+fn cancelling_a_reserved_turn_never_reuses_its_epoch() {
+    let (r, a) = setup(1, 1);
+    let mut s = Scheduler::default();
+    s.submit("approval", &r, &a, 1, input(), 1).unwrap();
+    let first = s.claim_ready(1, "local", 100).unwrap().remove(0);
+    let origin = first.lease.unwrap().epoch;
+    let reserved = s.reserve_approval_continuation(&first.id, origin).unwrap();
+    s.park_approval(&first.id, origin, "approval-1", "Wait".into())
+        .unwrap();
+    s.cancel_task(&first.id).unwrap();
+    assert!(s.task(&first.id).unwrap().continuation.is_none());
+    assert!(
+        s.wake_approval(&first.id, "approval-1", "Late".into())
+            .is_err()
+    );
+    s.submit("next", &r, &a, 1, input(), 1).unwrap();
+    let next = s.claim_ready(1, "local", 101).unwrap().remove(0);
+    assert!(next.lease.unwrap().epoch > reserved.epoch);
+}
+#[test]
 fn waiting_for_owner_frees_capacity_and_only_the_matching_operation_can_resume() {
     let (r, a) = setup(2, 1);
     let mut s = Scheduler::default();
