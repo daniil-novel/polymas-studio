@@ -71,6 +71,14 @@ impl Store {
         Self::initialize(Connection::open_in_memory()?)
     }
     fn initialize(connection: Connection) -> Result<Self> {
+        connection.create_scalar_function(
+            "polymas_lower",
+            1,
+            rusqlite::functions::FunctionFlags::SQLITE_UTF8
+                | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC
+                | rusqlite::functions::FunctionFlags::SQLITE_INNOCUOUS,
+            |context| Ok(context.get::<String>(0)?.to_lowercase()),
+        )?;
         connection.busy_timeout(Duration::from_secs(5))?;
         connection.pragma_update(None, "foreign_keys", true)?;
         connection.pragma_update(None, "journal_mode", "WAL")?;

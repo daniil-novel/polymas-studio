@@ -59,6 +59,7 @@
   - [x] D18a. HTTP lifecycle подключений и protected secret commands; UI/gateway далее.
   - [x] D18b. Каталог/мастер и bindings в UI; atomic activation, OAuth, удаление/ротация и approvals UI далее.
 - [ ] D19. Знания, журнал, replay и история конфигурации в UI.
+  - [x] D19a. Подготовка знаний к редактору: atomic idempotent commands, CAS проверки, ограниченные страницы и поиск; HTTP/UI/gateway далее.
 - [ ] D20. Масштабирование по правилам и ресурсные ограничения.
 - [ ] D21. Удалённые workers, enrollment, fencing и кластерный storage.
 - [ ] D22. Реальные Codex smoke/resume/concurrency и failure tests.
