@@ -100,6 +100,33 @@
 .archive-selection span {
   color: var(--muted);
 }
+.role-assignment-editor > label {
+  margin: 14px 0;
+}
+.assignment-role-review {
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 16px 0;
+  overflow-wrap: anywhere;
+}
+.assignment-role-review > code {
+  display: block;
+  color: var(--muted);
+  margin: 6px 0;
+  font-size: 11px;
+}
+.assignment-role-review pre {
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.6 var(--font-mono, monospace);
+}
+.assignment-role-review details {
+  margin: 14px 0;
+}
 @media (max-width: 760px) {
   .archive-impact {
     grid-template-columns: 1fr;

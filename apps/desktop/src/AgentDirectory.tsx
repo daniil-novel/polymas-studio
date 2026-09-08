@@ -6,6 +6,7 @@ import './instances.css';
 import { AgentNameEditor, type RefreshWorkspace } from './AgentNameEditor';
 import type { Command } from './RoleEditor';
 import { AgentArchiveDialog } from './AgentArchiveDialog';
+import { RoleAssignmentDialog } from './RoleAssignmentDialog';
 
 interface Row {
   agent: Agent;
@@ -42,6 +43,8 @@ export function AgentDirectory({
   const [selection, setSelection] = useState<Set<string>>(() => new Set());
   const [archiving, setArchiving] = useState<string[] | null>(null);
   const [archived, setArchived] = useState(false);
+  const [assigning, setAssigning] = useState<string[] | null>(null);
+  const [assigned, setAssigned] = useState(false);
   const rows = useMemo(() => {
     const config = snapshot.config.value;
     const states = new Map(nodes.map((node) => [node.id, node.state]));
@@ -168,6 +171,15 @@ export function AgentDirectory({
         >
           Архивировать выбранные
         </button>
+        <button
+          disabled={!refresh || !connected || selection.size === 0 || selection.size > 5000}
+          onClick={() => {
+            setAssigned(false);
+            setAssigning([...selection].sort());
+          }}
+        >
+          Назначить версию роли
+        </button>
       </div>
       <InstanceRows
         key={JSON.stringify([roleId, query, state, order])}
@@ -228,6 +240,26 @@ export function AgentDirectory({
             setSelection(new Set());
             setArchiving(null);
             setArchived(true);
+          }}
+        />
+      )}
+      {assigned && (
+        <p role="status" className="form-success">
+          Версия роли назначена выбранным экземплярам
+        </p>
+      )}
+      {assigning && refresh && (
+        <RoleAssignmentDialog
+          ids={assigning}
+          snapshot={snapshot}
+          connected={connected}
+          refresh={refresh}
+          command={command}
+          onClose={() => setAssigning(null)}
+          onSaved={() => {
+            setAssigning(null);
+            setSelection(new Set());
+            setAssigned(true);
           }}
         />
       )}
