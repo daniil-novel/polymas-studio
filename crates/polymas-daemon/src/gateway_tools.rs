@@ -290,5 +290,7 @@ async fn source(state: &AppState, scope: &Scope, input: SourceInput) -> Result<V
         tx.emit(EventInput::new("mcp.call_completed", json!({"callId":call_id,"taskId":scope.task_id,"epoch":scope.epoch,"connectionId":input.connection_id,"tool":input.tool,"success":result.as_ref().is_ok_and(|v| v["isError"] != true)})).agent(&scope.agent_id).run(&scope.run_id))?;
         Ok(())
     })?;
-    result.map_err(|error| Error::Runtime(credentials.diagnostic(&error.to_string())))
+    result
+        .map(|value| credentials.sanitize(value))
+        .map_err(|error| Error::Runtime(credentials.diagnostic(&error.to_string())))
 }

@@ -45,6 +45,10 @@ fn connector_diagnostics_remove_exact_secret_values_even_without_sensitive_field
         .diagnostic("Server says fixture-bearer-123 and fixture-password-456 were rejected");
     assert!(!output.contains("fixture-bearer-123"));
     assert!(!output.contains("fixture-password-456"));
+    let result = credentials.sanitize(json!({"content":[{"type":"text","text":"A fixture-bearer-123 was echoed"}],"structuredContent":{"fixture-password-456":["fixture-password-456","Keep this text"]}}));
+    assert!(!result.to_string().contains("fixture-password-456"));
+    assert!(!result.to_string().contains("fixture-bearer-123"));
+    assert!(result.to_string().contains("Keep this text"));
 }
 #[tokio::test]
 async fn a_file_connection_must_be_probed_before_enabling_and_stale_edits_cannot_restore_access() {

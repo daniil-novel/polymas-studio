@@ -79,11 +79,30 @@ pub struct Credentials {
     pub environment: BTreeMap<String, Secret>,
 }
 impl Credentials {
-    pub fn diagnostic(&self, text: &str) -> String {
-        let mut result = polymas_core::process::redact(text);
+    fn scrub(&self, text: &str) -> String {
+        let mut result = text.to_owned();
         for secret in self.environment.values().chain(self.bearer.iter()) {
             result = result.replace(secret.expose(), "[REDACTED]");
         }
+        result
+    }
+    pub fn sanitize(&self, value: Value) -> Value {
+        match value {
+            Value::String(text) => Value::String(self.scrub(&text)),
+            Value::Array(items) => {
+                Value::Array(items.into_iter().map(|v| self.sanitize(v)).collect())
+            }
+            Value::Object(items) => Value::Object(
+                items
+                    .into_iter()
+                    .map(|(k, v)| (self.scrub(&k), self.sanitize(v)))
+                    .collect(),
+            ),
+            other => other,
+        }
+    }
+    pub fn diagnostic(&self, text: &str) -> String {
+        let result = self.scrub(&polymas_core::process::redact(text));
         result.chars().take(4000).collect()
     }
 }

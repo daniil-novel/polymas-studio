@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D10 source credential review: RED отсутствовал sanitizer успешного MCP результата. GREEN вложенные content/structuredContent и ключи очищены от точных значений bearer/env secrets, обычный текст сохранён; два connection tests и clippy. Это защита от прямого echo, не обещание обнаружения произвольного кодирования секрета внешним сервером.
+
 D10f: RED отсутствующий configure_gateway. GREEN execution fixture проверяет gateway launch/env, scoped context во время настоящего дочернего процесса и 401 после сохранения результата. Два runtime tests и clippy. Реальный Codex MCP smoke выполняется отдельно после коммита.
 
 D10e: RED отдельный daemon --gateway-port закрывал initialize. GREEN: настоящий дочерний процесс bridge → MCP initialize/list/call → scoped HTTP → файловый marker; отзыв capability превращает следующий call в isError. Четыре gateway tests и clippy. Клиент теста — rmcp, реальный Codex проверяется после runtime wiring.
