@@ -441,3 +441,154 @@ async fn the_read_only_gateway_contract_cannot_execute_an_allowed_write_tool() {
             .any(|e| e.input.kind == "mcp.call_started")
     );
 }
+
+#[tokio::test]
+async fn agents_route_messages_with_pinned_edges_and_only_ack_their_own_delivered_inbox() {
+    use polymas_core::{
+        messages::Router as MessageRouter,
+        topology::{Edge, Target},
+    };
+    let (_dir, state, old_task) = setup().await;
+    let mut engine = state.engine.lock().await;
+    let epoch = engine
+        .scheduler
+        .task(&old_task)
+        .unwrap()
+        .lease
+        .as_ref()
+        .unwrap()
+        .epoch;
+    engine.finish(&old_task, epoch, Ok("done".into())).unwrap();
+    let agents: Vec<_> = engine
+        .workspace
+        .config()
+        .value
+        .registry
+        .agents
+        .iter()
+        .map(|a| a.id.clone())
+        .collect();
+    let mut architecture = engine.workspace.config().value.architecture.clone();
+    architecture.max_concurrency = 2;
+    architecture.edges = vec![Edge {
+        from: agents[0].clone(),
+        to: agents[1].clone(),
+    }];
+    let revision = engine.workspace.config().revision;
+    engine
+        .configure(revision, ConfigCommand::SetArchitecture { architecture })
+        .unwrap();
+    let run = engine
+        .submit(
+            "messages",
+            TaskInput {
+                prompt: "Exchange evidence".into(),
+                target: Target::System { broadcast: true },
+                ..Default::default()
+            },
+            2,
+        )
+        .unwrap();
+    let claimed = engine
+        .claim(2, "local", chrono::Utc::now().timestamp())
+        .unwrap();
+    let first = claimed
+        .iter()
+        .find(|t| t.assignee == agents[0])
+        .unwrap()
+        .id
+        .clone();
+    let second = claimed
+        .iter()
+        .find(|t| t.assignee == agents[1])
+        .unwrap()
+        .id
+        .clone();
+    drop(engine);
+    let a = issue(&state, &first).await.unwrap();
+    let b = issue(&state, &second).await.unwrap();
+    let (_, peers) = call(&state, a.token.expose(), "polymas_list_peers", json!({})).await;
+    assert_eq!(peers["isError"], false);
+    let peers: Value = serde_json::from_str(peers["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(peers["items"][0]["id"], agents[1]);
+    let message = json!({"idempotencyKey":"evidence-1","message":{"recipient":agents[1],"kind":"evidence","body":"Evidence fixture"}});
+    let (_, sent) = call(
+        &state,
+        a.token.expose(),
+        "polymas_send_message",
+        message.clone(),
+    )
+    .await;
+    assert_eq!(sent["isError"], false);
+    let sent: Value = serde_json::from_str(sent["content"][0]["text"].as_str().unwrap()).unwrap();
+    let id = sent["id"].as_str().unwrap();
+    assert_eq!(sent["state"], "queued");
+    let (_, duplicate) = call(
+        &state,
+        a.token.expose(),
+        "polymas_send_message",
+        message.clone(),
+    )
+    .await;
+    let duplicate: Value =
+        serde_json::from_str(duplicate["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(duplicate["id"], id);
+    let (_, inbox) = call(&state, b.token.expose(), "polymas_list_inbox", json!({})).await;
+    let inbox: Value = serde_json::from_str(inbox["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert!(inbox["items"].as_array().unwrap().is_empty());
+    let mut engine = state.engine.lock().await;
+    MessageRouter::deliver(
+        &mut engine.workspace.db,
+        &agents[1],
+        &[id.to_owned()],
+        "fixture-stdin-receipt",
+        chrono::Utc::now().timestamp(),
+    )
+    .unwrap();
+    drop(engine);
+    let (_, inbox) = call(&state, b.token.expose(), "polymas_list_inbox", json!({})).await;
+    let inbox: Value = serde_json::from_str(inbox["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(inbox["items"][0]["body"], "Evidence fixture");
+    assert_eq!(
+        call(
+            &state,
+            a.token.expose(),
+            "polymas_ack_message",
+            json!({"messageId":id})
+        )
+        .await
+        .1["isError"],
+        true
+    );
+    assert_eq!(
+        call(
+            &state,
+            b.token.expose(),
+            "polymas_ack_message",
+            json!({"messageId":id})
+        )
+        .await
+        .1["isError"],
+        false
+    );
+    let mut engine = state.engine.lock().await;
+    let mut architecture = engine.workspace.config().value.architecture.clone();
+    architecture.edges.clear();
+    let revision = engine.workspace.config().revision;
+    engine
+        .configure(revision, ConfigCommand::SetArchitecture { architecture })
+        .unwrap();
+    assert_eq!(
+        MessageRouter::history(&engine.workspace.db, Some(&run.id), 10).unwrap()[0].state,
+        "acknowledged"
+    );
+    drop(engine);
+    let mut revoked = message;
+    revoked["idempotencyKey"] = json!("evidence-2");
+    assert_eq!(
+        call(&state, a.token.expose(), "polymas_send_message", revoked)
+            .await
+            .1["isError"],
+        true
+    );
+}

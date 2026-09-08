@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D10g: RED polymas_list_peers возвращал isError. GREEN два scope → разрешённый peer → одно durable message при повторе ключа; queued отсутствует в delivered inbox; после fixture stdin receipt содержимое доступно только получателю; чужой ack и отозванное ребро отклонены. Шесть gateway tests, четыре message tests и clippy. Тест не запускает модельную переписку; send не создаёт задачу автоматически, delegation/wait-resume отдельные срезы.
+
 D10 actual read smoke: computer use → реальный Codex 0.144.1, PID 29644, task 870471fb-7da3-455f-8d3d-876b26c90c8a → polymas_list_sources / polymas_read_source → read_text completed success=true → точный POLYMAS-KNOWLEDGE-93. Результат и артефакт приняты через UI. В MCP runtime events только metadata; источник не дублируется в activity payload. Экран результата проверен зрительно 1600×1000. Это Files, не Neo4j и не concurrency gate.
 
 D08 scoped inbox: RED отсутствовали run-filtered pending и cursor inbox. GREEN 100 сообщений другого run не скрывают нужное; queued не выдаётся как доставленное; страницы/recipient/expiry соблюдаются. Четыре message tests, два runtime tests и clippy.

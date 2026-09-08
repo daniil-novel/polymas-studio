@@ -153,6 +153,8 @@ fn inbox_queries_scope_the_run_before_limiting_and_expose_only_delivered_message
     let next = Router::inbox(&db, "current-run", "b", page.cursor, 1, 104).unwrap();
     assert_eq!(next.items[0].id, second.id);
     assert!(!next.has_more);
+    assert!(Router::get_for_recipient(&db, "other-run", "b", &first.id).is_err());
+    assert!(Router::get_for_recipient(&db, "current-run", "a", &first.id).is_err());
     assert!(
         Router::inbox(&db, "current-run", "a", 0, 100, 104)
             .unwrap()

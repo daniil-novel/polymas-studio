@@ -73,6 +73,19 @@ fn save_message(conn: &rusqlite::Connection, message: &Message) -> Result<()> {
     Ok(())
 }
 impl Router {
+    pub fn get_for_recipient(
+        db: &Store,
+        run_id: &str,
+        recipient: &str,
+        message_id: &str,
+    ) -> Result<Message> {
+        let message = read_message(db.connection(), message_id)?;
+        require(
+            message.run_id == run_id && message.recipient == recipient,
+            "Сообщение не принадлежит inbox этого запуска",
+        )?;
+        Ok(message)
+    }
     pub fn pending_for_run(
         db: &Store,
         run_id: &str,
