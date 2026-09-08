@@ -7,6 +7,11 @@ struct AttemptRequest {
     request_key_hash: String,
     fingerprint: String,
 }
+#[derive(Serialize, Deserialize)]
+struct ExecutionRequest {
+    approval_id: String,
+    fingerprint: String,
+}
 fn attempt_key(task_id: &str, epoch: u64) -> Result<String> {
     require(
         !task_id.is_empty() && task_id.len() <= 200 && epoch > 0,
@@ -97,7 +102,61 @@ impl ApprovalLedger {
                 fingerprint,
             },
         )?;
+        tx.put(
+            "approval_executions",
+            &attempt_key(&approval.operation.task_id, approval.operation.epoch)?,
+            0,
+            &ExecutionRequest {
+                approval_id: approval.id.clone(),
+                fingerprint: approval.fingerprint.clone(),
+            },
+        )?;
         Ok(approval)
+    }
+    pub fn for_execution(db: &Store, task_id: &str, epoch: u64) -> Result<Option<Approval>> {
+        let Some(receipt) =
+            db.get::<ExecutionRequest>("approval_executions", &attempt_key(task_id, epoch)?)?
+        else {
+            return Ok(None);
+        };
+        let approval = db
+            .get::<Approval>("approvals", &receipt.value.approval_id)?
+            .ok_or_else(|| Error::Storage("Разрешение исполнения отсутствует".into()))?
+            .value;
+        require(
+            approval.operation.task_id == task_id
+                && approval.operation.epoch == epoch
+                && approval.fingerprint == receipt.value.fingerprint
+                && approval.operation.fingerprint()? == approval.fingerprint,
+            "Разрешение относится к другой попытке исполнения",
+        )?;
+        Ok(Some(approval))
+    }
+    pub(crate) fn expire_in(
+        tx: &WriteTransaction<'_>,
+        id: &str,
+        timestamp: i64,
+    ) -> Result<Approval> {
+        let mut stored = tx
+            .get::<Approval>("approvals", id)?
+            .ok_or_else(|| Error::NotFound("Разрешение не найдено".into()))?;
+        if matches!(
+            stored.value.state,
+            ApprovalState::Pending | ApprovalState::Approved
+        ) && timestamp >= stored.value.expires_at
+        {
+            stored.value.state = ApprovalState::Expired;
+            tx.put("approvals", id, stored.revision, &stored.value)?;
+            tx.emit(
+                EventInput::new(
+                    "approval.expired",
+                    json!({"approvalId":id,"taskId":stored.value.operation.task_id}),
+                )
+                .agent(&stored.value.operation.agent_id)
+                .run(&stored.value.operation.run_id),
+            )?;
+        }
+        Ok(stored.value)
     }
     pub fn for_attempt(db: &Store, task_id: &str, epoch: u64) -> Result<Option<Approval>> {
         let key = attempt_key(task_id, epoch)?;

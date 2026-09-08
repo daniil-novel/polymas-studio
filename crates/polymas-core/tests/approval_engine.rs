@@ -8,6 +8,141 @@ use polymas_core::{
 };
 use serde_json::json;
 
+#[test]
+fn owner_decision_resumes_only_the_reserved_turn_and_execution_consumes_once() {
+    let (dir, mut engine, request) = setup();
+    let approval = engine
+        .request_approval("request", request.clone(), 100, 30)
+        .unwrap();
+    let revision = engine
+        .workspace
+        .db
+        .get::<Approval>("approvals", &approval.id)
+        .unwrap()
+        .unwrap()
+        .revision;
+    engine
+        .park_approval(&request.task_id, request.origin_epoch, "Await owner".into())
+        .unwrap();
+    drop(engine);
+    let mut engine = Engine::open(dir.path()).unwrap();
+    assert!(engine.wake_approvals(101).unwrap().is_empty());
+    assert!(
+        engine
+            .decide_approval(&approval.id, revision + 1, &approval.fingerprint, true, 102)
+            .is_err()
+    );
+    engine
+        .decide_approval(&approval.id, revision, &approval.fingerprint, true, 102)
+        .unwrap();
+    engine
+        .decide_approval(&approval.id, revision, &approval.fingerprint, true, 103)
+        .unwrap();
+    assert!(
+        engine
+            .decide_approval(&approval.id, i64::MAX, &approval.fingerprint, true, 103)
+            .is_err()
+    );
+    assert!(
+        engine
+            .decide_approval(&approval.id, revision, &approval.fingerprint, false, 103)
+            .is_err()
+    );
+    assert_eq!(
+        engine.wake_approvals(103).unwrap(),
+        vec![request.task_id.clone()]
+    );
+    assert!(engine.wake_approvals(103).unwrap().is_empty());
+    assert!(
+        engine
+            .consume_approval(&request.task_id, request.origin_epoch, &approval.id, 103)
+            .is_err()
+    );
+    let resumed = engine.claim(1, "local", 104).unwrap().remove(0);
+    let epoch = resumed.lease.unwrap().epoch;
+    assert_eq!(epoch, approval.operation.epoch);
+    let lookup = ApprovalLedger::for_execution(&engine.workspace.db, &request.task_id, epoch)
+        .unwrap()
+        .unwrap();
+    assert_eq!(lookup.id, approval.id);
+    assert!(
+        engine
+            .consume_approval("other-task", epoch, &approval.id, 104)
+            .is_err()
+    );
+    engine
+        .consume_approval(&request.task_id, epoch, &approval.id, 104)
+        .unwrap();
+    assert!(
+        engine
+            .consume_approval(&request.task_id, epoch, &approval.id, 105)
+            .is_err()
+    );
+}
+
+#[test]
+fn expiry_revocation_and_cancellation_cannot_grant_an_external_write() {
+    let (_dir, mut engine, request) = setup();
+    let approval = engine
+        .request_approval("request", request.clone(), 100, 2)
+        .unwrap();
+    engine
+        .park_approval(&request.task_id, request.origin_epoch, "Wait".into())
+        .unwrap();
+    assert_eq!(
+        engine.wake_approvals(102).unwrap(),
+        vec![request.task_id.clone()]
+    );
+    assert_eq!(
+        engine
+            .workspace
+            .db
+            .get::<Approval>("approvals", &approval.id)
+            .unwrap()
+            .unwrap()
+            .value
+            .state,
+        polymas_core::policy::ApprovalState::Expired
+    );
+    let resumed = engine.claim(1, "local", 103).unwrap().remove(0);
+    assert!(
+        engine
+            .consume_approval(
+                &request.task_id,
+                resumed.lease.unwrap().epoch,
+                &approval.id,
+                103
+            )
+            .is_err()
+    );
+
+    let (_dir2, mut e2, r2) = setup();
+    let a2 = e2.request_approval("request", r2.clone(), 100, 30).unwrap();
+    e2.park_approval(&r2.task_id, r2.origin_epoch, "Wait".into())
+        .unwrap();
+    e2.decide_approval(&a2.id, 1, &a2.fingerprint, true, 101)
+        .unwrap();
+    e2.wake_approvals(101).unwrap();
+    let t2 = e2.claim(1, "local", 101).unwrap().remove(0);
+    e2.configure(4, ConfigCommand::SetBindings { bindings: vec![] })
+        .unwrap();
+    assert!(
+        e2.consume_approval(&r2.task_id, t2.lease.unwrap().epoch, &a2.id, 102)
+            .is_err()
+    );
+
+    let (_dir3, mut e3, r3) = setup();
+    let a3 = e3.request_approval("request", r3.clone(), 100, 30).unwrap();
+    e3.park_approval(&r3.task_id, r3.origin_epoch, "Wait".into())
+        .unwrap();
+    e3.cancel_task(&r3.task_id).unwrap();
+    assert!(
+        e3.decide_approval(&a3.id, 1, &a3.fingerprint, true, 101)
+            .is_err()
+    );
+    assert!(e3.wake_approvals(101).unwrap().is_empty());
+}
+
 fn setup() -> (tempfile::TempDir, Engine, OperationRequest) {
     let dir = tempfile::tempdir().unwrap();
     let mut engine = Engine::open(dir.path()).unwrap();
