@@ -4,6 +4,106 @@ use crate::storage::{EventInput, Store};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Subject {
+    Agent { id: String },
+    Role { id: String },
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Binding {
+    pub id: String,
+    pub connection_id: String,
+    pub subject: Subject,
+    pub tools: BTreeSet<String>,
+    pub allow_write: bool,
+    pub required: bool,
+    pub namespace: String,
+}
+impl Binding {
+    pub fn validate(&self) -> Result<()> {
+        require(
+            !self.id.is_empty() && !self.connection_id.is_empty(),
+            "Binding требует идентификаторов",
+        )?;
+        require(
+            !self.namespace.is_empty()
+                && self.namespace.len() <= 120
+                && self
+                    .namespace
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || "_-./".contains(c)),
+            "Некорректный namespace",
+        )?;
+        require(
+            !self.tools.is_empty()
+                && self.tools.len() <= 1000
+                && self.tools.iter().all(|t| !t.is_empty() && t.len() <= 200),
+            "Укажите разрешённые инструменты",
+        )
+    }
+    pub fn matches(&self, agent_id: &str, role_id: &str) -> bool {
+        match &self.subject {
+            Subject::Agent { id } => id == agent_id,
+            Subject::Role { id } => id == role_id,
+        }
+    }
+}
+#[derive(Debug)]
+pub struct Authorization {
+    pub namespaces: BTreeSet<String>,
+    pub approval_required: bool,
+}
+
+/// Capabilities can shrink during a turn, but only a new turn may acquire new
+/// capabilities. Server-side live configuration is consulted on every call.
+pub fn authorize_tool(
+    agent_id: &str,
+    role_id: &str,
+    connection: &crate::connections::Connection,
+    tool: &str,
+    live: &[Binding],
+    snapshot: &[Binding],
+) -> Result<Authorization> {
+    if !connection.allows_tool(tool) {
+        return Err(Error::Denied(
+            "Подключение или инструмент недоступны".into(),
+        ));
+    }
+    let descriptor = connection
+        .tools
+        .iter()
+        .find(|t| t.name == tool)
+        .ok_or_else(|| Error::Denied("Инструмент недоступен".into()))?;
+    let scopes = |bindings: &[Binding]| -> BTreeSet<String> {
+        bindings
+            .iter()
+            .filter(|b| {
+                b.validate().is_ok()
+                    && b.matches(agent_id, role_id)
+                    && b.connection_id == connection.id
+                    && b.tools.contains(tool)
+                    && (descriptor.read_only || b.allow_write)
+            })
+            .map(|b| b.namespace.clone())
+            .collect()
+    };
+    let current = scopes(live);
+    let previous = scopes(snapshot);
+    let namespaces: BTreeSet<_> = current.intersection(&previous).cloned().collect();
+    if namespaces.is_empty() {
+        return Err(Error::Denied(
+            "Нет действующего binding для этого агента и инструмента".into(),
+        ));
+    }
+    Ok(Authorization {
+        namespaces,
+        approval_required: !descriptor.read_only,
+    })
+}
 
 /// The exact operation approved by a person. A new lease or connection revision
 /// invalidates an old approval, even if its arguments happen to be identical.

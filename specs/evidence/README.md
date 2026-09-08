@@ -18,5 +18,6 @@
 | D09b | `mcp_client` отсутствует, E0432 | Реальный STDIO MCP fixture: initialize → tools/list → tools/call; disabled/unlisted rejected | Neo4j endpoint/credentials пока не предоставлены; HTTP отдельный integration сценарий |
 | D09c | `secrets` отсутствует, E0432 | Secret Debug redaction; opt-in Windows Credential Manager save/load/delete собственной fixture записи | Нативный test исключён из обычного CI, выполнен отдельно на хосте |
 | D10a | `policy` отсутствует, E0432 | Single-use после reopen; изменённые аргументы/epoch/expiry отклоняются; отказ не исполняется | Gateway связывает ledger с фактическим вызовом отдельным срезом |
+| D10b | Binding/authorize_tool отсутствуют, E0432 | Revocation, новые grants, чужой агент, disabled MCP, unlisted tool отклоняются | Namespace проверяет gateway; raw DB principal требует отдельной изоляции |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.

@@ -15,6 +15,7 @@
 - [x] D09. MCP-рецепты, stdio/HTTP, диагностика и секретное хранилище; расширенные integration tests в D22.
 - [ ] D10. Gateway: bindings, ограничения инструментов и approvals.
   - [x] D10a. Durable exact-operation approvals; привязка к gateway следует отдельно.
+  - [x] D10b. Role/agent bindings, tool allowlist и пересечение namespaces.
 - [ ] D11. Источники, утверждения, связи и происхождение знаний.
 - [ ] D12. Артефакты с hash, экспорт, backup и восстановление.
 - [ ] D13. Фоновая служба и защищённое desktop-подключение.
