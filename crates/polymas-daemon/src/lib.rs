@@ -1,4 +1,5 @@
 //! Local authenticated control plane. The desktop and worker bridge use separate credentials.
+mod activity;
 pub mod approval_api;
 pub mod bridge;
 pub mod connection_api;
@@ -177,6 +178,7 @@ async fn snapshot(State(state): State<AppState>) -> std::result::Result<Json<Val
     )?;
     value["runs"]=json!(engine.scheduler.runs.iter().rev().take(100).map(|r| json!({"id":r.id,"title":r.title,"createdAt":r.created_at,"accepted":r.accepted,"stopped":r.stopped,"taskIds":r.task_ids,"configRevision":r.config_revision,"completion":r.input.completion})).collect::<Vec<_>>());
     value["taskCount"] = json!(engine.scheduler.tasks.len());
+    value["agentActivity"] = serde_json::to_value(activity::project(&engine))?;
     value["tasks"]=json!(engine.scheduler.tasks.iter().rev().take(1000).map(|t| json!({"id":t.id,"runId":t.run_id,"assignee":t.assignee,"state":t.state,"attempt":t.attempt,"lease":t.lease,"createdAt":t.created_at,"completedAt":t.completed_at,"artifactIds":t.artifact_ids,"error":t.error})).collect::<Vec<_>>());
     Ok(Json(value))
 }

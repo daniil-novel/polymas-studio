@@ -81,14 +81,14 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   const activeHolon = holons.find((h) => h.id === holonId);
   const agents = config?.registry.agents.filter((a) => a.status !== 'archived') ?? [];
   const selected = agents.find((a) => a.id === selectedId);
+  const activity = snapshot?.agentActivity ?? snapshot?.tasks ?? [];
   const projection = config
-    ? projectGraph(agents, config.architecture, snapshot?.tasks ?? [], events, connected, now)
+    ? projectGraph(agents, config.architecture, activity, events, connected, now)
     : null;
   const running =
     projection?.nodes.filter((node) => node.kind === 'agent' && node.active).length ?? 0;
   const selectedState = projection?.nodes.find((node) => node.id === selectedId)?.state ?? 'idle';
-  const canStop =
-    snapshot?.tasks.some((task) => ['running', 'stopping'].includes(task.state)) ?? false;
+  const canStop = activity.some((task) => ['running', 'stopping'].includes(task.state));
   const act = async (action: string) => {
     setBusy(true);
     try {

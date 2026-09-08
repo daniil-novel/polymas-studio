@@ -151,6 +151,7 @@ export interface Task extends TaskSummary {
   dependencies: string[];
   newSession: boolean;
 }
+export type AgentActivity = Pick<TaskSummary, 'id' | 'assignee' | 'state' | 'lease'>;
 export interface Run {
   completion:
     { type: 'all_required' | 'manual' | 'first_accepted' } | { type: 'quorum'; required: number };
@@ -176,6 +177,7 @@ export interface Snapshot {
   paused: boolean;
   runtime: RuntimeStatus;
   agentRuntime: Stored<AgentRuntime>[];
+  agentActivity?: AgentActivity[];
   runs: Run[];
   tasks: TaskSummary[];
   taskCount: number;

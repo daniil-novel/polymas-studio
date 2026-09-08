@@ -99,6 +99,7 @@
   - [x] D19h. Read-only recording API: pinned configuration и ограниченные страницы событий до frozen cursor; UI replay далее.
   - [x] D19i. Отдельный read-only replay: шкала/скорость/пауза, записанные состояния и импульсы, поиск/фильтры, body события по запросу; CU реального memory run. Серверные checkpoints для >100 000 событий и масштабный gate далее.
 - [ ] D20. Масштабирование по правилам и ресурсные ограничения.
+  - [x] D20a. Сводка активности по каждому экземпляру отдельно от последних 1000 задач; старый running не исчезает с графа и остаётся доступным для остановки. Индексы/нагрузочные gate далее.
 - [ ] D21. Удалённые workers, enrollment, fencing и кластерный storage.
 - [ ] D22. Реальные Codex smoke/resume/concurrency и failure tests.
 - [ ] D23. Browser e2e, computer use и визуальная сверка трёх экранов.

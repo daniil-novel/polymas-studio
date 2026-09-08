@@ -88,6 +88,7 @@ function setup(running = false) {
     });
   });
   return {
+    state,
     client,
     deliver: (events: RuntimeEvent[]) =>
       deliver({ events, cursor: events.length, head: events.length }),
@@ -116,6 +117,18 @@ test('a newly received event reaches the graph before the next periodic clock ti
   view.rerender(<App client={client} />);
   expect(screen.getByLabelText('Импульсы памяти').textContent).toBe('0');
 });
+
+test('agent activity outside the recent task page still drives the graph and cancellation', async () => {
+  const { client, deliver, state } = setup(true);
+  state.agentActivity = state.tasks;
+  state.tasks = [];
+  state.taskCount = 1001;
+  render(<App client={client} />);
+  await screen.findByLabelText('Импульсы памяти');
+  await act(async () => deliver([]));
+  expect(screen.getByTestId('running-count').textContent).toBe('1 работают');
+  expect(screen.getByRole('button', { name: 'Остановить' })).toHaveProperty('disabled', false);
+});
 test('header and inspector stop reporting a stale lease as running without disabling cancellation', async () => {
   const { client, deliver } = setup(true);
   const view = render(<App client={client} />);
@@ -125,10 +138,7 @@ test('header and inspector stop reporting a stale lease as running without disab
   vi.setSystemTime(base + 16000);
   view.rerender(<App client={client} />);
   expect(screen.getByTestId('running-count').textContent).toBe('0 работают');
-  expect(screen.getByRole('button', { name: 'Остановить' })).toHaveProperty(
-    'disabled',
-    false,
-  );
+  expect(screen.getByRole('button', { name: 'Остановить' })).toHaveProperty('disabled', false);
   fireEvent.click(screen.getByRole('button', { name: 'Выбрать тестовый узел' }));
   expect(screen.getByText('Нет свежих данных')).toBeTruthy();
 });

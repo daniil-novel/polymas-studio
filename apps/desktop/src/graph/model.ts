@@ -1,4 +1,4 @@
-import type { Agent, Architecture, RuntimeEvent, TaskSummary } from '../types';
+import type { Agent, AgentActivity, Architecture, RuntimeEvent } from '../types';
 
 export const HEARTBEAT_STALE_MS = 15_000;
 export const IMPULSE_MS = 1800;
@@ -66,12 +66,12 @@ export function stablePositions(
 export function projectGraph(
   agents: Agent[],
   architecture: Architecture,
-  tasks: TaskSummary[],
+  tasks: AgentActivity[],
   events: RuntimeEvent[],
   connected: boolean,
   now: number,
 ): GraphProjection {
-  const states = new Map<string, TaskSummary>();
+  const states = new Map<string, AgentActivity>();
   for (const task of tasks) {
     if (['running', 'stopping', 'unknown'].includes(task.state)) states.set(task.assignee, task);
     else if (
