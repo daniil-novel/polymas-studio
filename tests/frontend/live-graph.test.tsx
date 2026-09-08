@@ -83,6 +83,7 @@ function setup(running = false) {
   } as unknown as Snapshot;
   vi.spyOn(client, 'request').mockImplementation(async (path) => {
     if (path === '/api/state') return state;
+    if (path === '/api/control') return { ok: true };
     return new Promise((resolve) => {
       deliver = resolve;
     });
@@ -129,6 +130,25 @@ test('agent activity outside the recent task page still drives the graph and can
   expect(screen.getByTestId('running-count').textContent).toBe('1 работают');
   expect(screen.getByRole('button', { name: 'Остановить' })).toHaveProperty('disabled', false);
 });
+
+test.each(['queued', 'waiting', 'waiting_user'] as const)(
+  'global stop remains available for %s tasks while the queue is paused',
+  async (stateName) => {
+    const { client, deliver, state } = setup(true);
+    state.tasks[0].state = stateName;
+    state.tasks[0].lease = null;
+    state.paused = true;
+    state.agentActivity = state.tasks;
+    state.tasks = [];
+    render(<App client={client} />);
+    await screen.findByLabelText('Импульсы памяти');
+    await act(async () => deliver([]));
+    const stop = screen.getByRole('button', { name: 'Остановить' });
+    expect(stop).toHaveProperty('disabled', false);
+    await act(async () => fireEvent.click(stop));
+    expect(client.request).toHaveBeenCalledWith('/api/control', { action: 'stop_all' });
+  },
+);
 test('header and inspector stop reporting a stale lease as running without disabling cancellation', async () => {
   const { client, deliver } = setup(true);
   const view = render(<App client={client} />);

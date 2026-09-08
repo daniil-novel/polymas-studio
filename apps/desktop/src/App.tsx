@@ -88,7 +88,9 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   const running =
     projection?.nodes.filter((node) => node.kind === 'agent' && node.active).length ?? 0;
   const selectedState = projection?.nodes.find((node) => node.id === selectedId)?.state ?? 'idle';
-  const canStop = activity.some((task) => ['running', 'stopping'].includes(task.state));
+  const canStop = activity.some((task) =>
+    ['queued', 'running', 'stopping', 'waiting', 'waiting_user'].includes(task.state),
+  );
   const act = async (action: string) => {
     setBusy(true);
     try {
