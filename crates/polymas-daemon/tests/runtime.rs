@@ -23,12 +23,17 @@ impl Executor for FixtureExecutor {
         cancel: watch::Receiver<bool>,
     ) -> Execution {
         Box::pin(async move {
-            let script = "import sys,json,uuid; sys.stdin.read(); print(json.dumps({'type':'thread.started','thread_id':str(uuid.uuid4())})); print(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':'Actual child result'}})); print(json.dumps({'type':'turn.completed','usage':{'input_tokens':1,'output_tokens':2}}))";
+            let script = "import sys,json,uuid; sys.stdin.read(); print(json.dumps({'type':'thread.started','thread_id':sys.argv[1] or str(uuid.uuid4())})); print(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':'Actual child result'}})); print(json.dumps({'type':'turn.completed','usage':{'input_tokens':1,'output_tokens':2}}))";
             let (tx, mut rx) = mpsc::channel(32);
             let child = tokio::spawn(run_process(
                 ProcessSpec {
                     executable: if cfg!(windows) { "python" } else { "python3" }.into(),
-                    args: vec!["-u".into(), "-c".into(), script.into()],
+                    args: vec![
+                        "-u".into(),
+                        "-c".into(),
+                        script.into(),
+                        request.session_id.clone().unwrap_or_default(),
+                    ],
                     workspace: request.workspace,
                     stdin: request.prompt,
                     timeout_seconds: 10,
@@ -37,7 +42,7 @@ impl Executor for FixtureExecutor {
                 tx,
                 cancel,
             ));
-            let mut stream = CodexStream::new(None);
+            let mut stream = CodexStream::new(request.session_id);
             while let Some(event) = rx.recv().await {
                 if event.kind == "runtime.event" {
                     stream.observe(&event.body)?;

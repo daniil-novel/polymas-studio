@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D10j: RED directive давал awaiting_acceptance вместо waiting; дополнительный RED другая сессия того же агента подменяла продолжение. GREEN C=1: первый агент ждёт, второй отправляет, первый возобновляется с прежней task session и сообщением; промежуточный артефакт partial, active registry очищен. Один wait runtime fixture, три OS runtime fixtures, семь gateway tests и clippy. Wait executor имитирует reap и не считается реальной моделью/процессом; отдельный actual smoke следует далее.
+
 D10i: RED неизвестный polymas_wait_for_message. GREEN одинаковый повтор сохраняет первоначальный deadline, конфликт и чужой sender отклонены, directive записан в БД, задача остаётся running до reap. Семь gateway tests и clippy пройдены; runtime ещё не применяет directive.
 
 Inbox ACL regression: RED отсутствующий pending_context_messages. GREEN 100 сообщений от отозванного отправителя с намеренно несовместимым JSON document пропущены до десериализации; 101-е разрешённое сообщение доставляется в batch. Пять engine, четыре messages, шесть gateway, три runtime tests и workspace clippy пройдены.
