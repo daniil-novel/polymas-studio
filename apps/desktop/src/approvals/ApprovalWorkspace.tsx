@@ -11,6 +11,7 @@ import {
 } from './model';
 import './approvals.css';
 import { ReconciliationForm, type ReconciliationDraft } from './ReconciliationForm';
+import { OperationResultViewer } from './OperationResultViewer';
 const emptyDraft: ReconciliationDraft = { outcome: '', note: '' };
 
 const date = (seconds: number) => new Date(seconds * 1000).toLocaleString('ru');
@@ -381,6 +382,14 @@ function ApprovalCard({
             <Check size={16} /> Разрешить эту операцию
           </button>
         </div>
+      )}
+      {detail.resultMetadata && (
+        <OperationResultViewer
+          client={client}
+          id={value.id}
+          metadata={detail.resultMetadata}
+          connected={connected}
+        />
       )}
       {value.state === 'unknown' && (
         <ReconciliationForm

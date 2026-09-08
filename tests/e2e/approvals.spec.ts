@@ -1,9 +1,20 @@
 import { expect, test } from '@playwright/test';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+
+const savedResult = JSON.stringify({
+  response: { content: [{ type: 'text', text: 'RESULT-FIXTURE-91 🧠' }] },
+  diagnostic: null,
+});
+const resultMetadata = {
+  byteLength: Buffer.byteLength(savedResult),
+  sha256: createHash('sha256').update(savedResult).digest('hex'),
+};
 
 const operation = {
   id: 'approval-layout-fixture',
   fingerprint: 'f'.repeat(64),
-  state: 'revoked',
+  state: 'succeeded',
   createdAt: 100,
   expiresAt: 200,
   operation: {
@@ -79,6 +90,7 @@ for (const width of [736, 1280, 1600]) {
         };
       else if (path === `/api/approvals/${operation.id}`)
         json = {
+          resultMetadata,
           approval: { revision: 3, value: operation },
           connection: {
             name: 'Архив отчётов',
@@ -88,6 +100,8 @@ for (const width of [736, 1280, 1600]) {
           canDeny: false,
           unavailableReason: null,
         };
+      else if (path === `/api/approvals/${operation.id}/result`)
+        json = { metadata: resultMetadata, offset: 0, nextOffset: null, chunk: savedResult };
       else throw new Error(`Unexpected fixture request ${path}`);
       await route.fulfill({ json });
     });
@@ -95,6 +109,13 @@ for (const width of [736, 1280, 1600]) {
     await page.getByRole('button', { name: 'Подтверждения', exact: true }).click();
     const card = page.getByRole('region', { name: 'Точная операция' });
     await expect(card).toBeVisible();
+    await card.getByRole('button', { name: 'Показать ответ', exact: true }).click();
+    await expect(card.locator('.operation-result-text')).toContainText('RESULT-FIXTURE-91 🧠');
+    const pendingDownload = page.waitForEvent('download');
+    await card.getByRole('button', { name: 'Скачать ответ JSON', exact: true }).click();
+    const download = await pendingDownload;
+    expect(await download.failure()).toBeNull();
+    expect(await readFile((await download.path())!, 'utf-8')).toBe(savedResult);
     await card.getByText('Данные операции', { exact: true }).click();
     await expect(card.getByText(operation.fingerprint, { exact: true })).toBeVisible();
     const box = await card.boundingBox();

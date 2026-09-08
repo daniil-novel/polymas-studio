@@ -1,4 +1,5 @@
 import type { Connection, Stored } from '../types';
+import type { ResultMetadata } from './result-data';
 export type ApprovalState =
   | 'pending'
   | 'approved'
@@ -54,6 +55,7 @@ export interface Approval {
   };
 }
 export interface ApprovalDetail {
+  resultMetadata?: ResultMetadata | null;
   reconciliation?: {
     outcome: 'succeeded' | 'failed';
     note: string;

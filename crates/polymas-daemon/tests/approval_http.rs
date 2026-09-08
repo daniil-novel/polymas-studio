@@ -239,7 +239,8 @@ fn create_local_approval_review_fixture() {
             "Подготовлен отчёт; ожидается решение владельца.".into(),
         )
         .unwrap();
-    if std::env::var("POLYMAS_VISUAL_FIXTURE_STATE").as_deref() == Ok("unknown") {
+    let visual_state = std::env::var("POLYMAS_VISUAL_FIXTURE_STATE").unwrap_or_default();
+    if matches!(visual_state.as_str(), "unknown" | "result") {
         let now = chrono::Utc::now().timestamp();
         engine
             .decide_approval(&approval.id, 1, &approval.fingerprint, true, now)
@@ -255,6 +256,19 @@ fn create_local_approval_review_fixture() {
             )
             .unwrap();
         // Deliberate test data: no external call occurs. Reopen recovers the abandoned lease.
+        if visual_state == "result" {
+            polymas_core::policy::ApprovalLedger::complete_with_result(
+                &mut engine.workspace.db, &approval.id, polymas_core::policy::ApprovalState::Succeeded,
+                Some(json!({"response":{"content":[{"type":"text","text":"Контрольный ответ инструмента · RESULT-VIEW-92.\nИсточник: тестовые данные.\nКаждый экземпляр агента сохраняет собственную сессию."}],"isError":false},"diagnostic":null})),
+            ).unwrap();
+            engine
+                .finish(
+                    &task.id,
+                    task.lease.as_ref().unwrap().epoch,
+                    Ok("Ответ сохранён; требуется проверка результата.".into()),
+                )
+                .unwrap();
+        }
     }
     engine.pause(true).unwrap();
     drop(engine);
