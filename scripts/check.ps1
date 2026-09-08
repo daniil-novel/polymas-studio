@@ -22,6 +22,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'UI build failed' }
     }
     if ($Scope -in @('all','spec')) {
+        python -m unittest discover -s tests/packaging -p 'test_*.py'
+        if ($LASTEXITCODE -ne 0) { throw 'Packaging evidence tests failed' }
         python scripts/validate_spec.py
         if ($LASTEXITCODE -ne 0) { throw 'Specification validation failed' }
     }
