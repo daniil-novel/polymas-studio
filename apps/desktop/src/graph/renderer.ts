@@ -14,6 +14,7 @@ const colors: Record<string, string> = {
   queued: '#A7B3C4',
   stale: '#6F7D93',
   unknown: '#F2C46D',
+  waiting_user: '#F2C46D',
   stopping: '#F2C46D',
   failed: '#FF8585',
 };

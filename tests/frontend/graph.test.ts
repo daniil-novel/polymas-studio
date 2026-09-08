@@ -2,6 +2,21 @@ import { expect, test } from 'vitest';
 import { projectGraph, layoutGraph, stablePositions } from '../../apps/desktop/src/graph/model';
 import type { Agent, Architecture, RuntimeEvent, TaskSummary } from '../../apps/desktop/src/types';
 import type { GraphNode } from '../../apps/desktop/src/graph/model';
+import { agentState } from '../../apps/desktop/src/types';
+
+test('owner wait takes precedence over another queued task without a running glow', () => {
+  const waiting = { assignee: 'a0', state: 'waiting_user', lease: null } as unknown as TaskSummary;
+  const queued = { assignee: 'a0', state: 'queued', lease: null } as TaskSummary;
+  for (const tasks of [
+    [waiting, queued],
+    [queued, waiting],
+  ]) {
+    expect(
+      projectGraph(agents(1), arch(), tasks, [], true, now).nodes.map((n) => [n.state, n.active]),
+    ).toEqual([['waiting_user', false]]);
+    expect(agentState(agents(1)[0], tasks)).toBe('waiting_user');
+  }
+});
 
 const agents = (n: number): Agent[] =>
   Array.from(

@@ -10,6 +10,47 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 const TOKEN: &str = "approval-owner-fixture-token-32-characters";
 
+/// Manual browser QA uses an explicitly separate, new workspace with no real target.
+#[test]
+#[ignore = "requires POLYMAS_VISUAL_FIXTURE_DIR naming a new local directory"]
+fn create_local_approval_review_fixture() {
+    let target = std::path::PathBuf::from(std::env::var("POLYMAS_VISUAL_FIXTURE_DIR").unwrap());
+    assert!(target.is_absolute() && !target.exists());
+    let (dir, mut engine, mut request) = fixture::setup();
+    engine
+        .configure(
+            4,
+            polymas_core::workspace::ConfigCommand::RenameWorkspace {
+                name: "Проверка подтверждений · тестовые данные".into(),
+            },
+        )
+        .unwrap();
+    request.arguments = json!({"document":"reports/architecture.md","title":"Архитектура агентов","text":"Каждый экземпляр сохраняет собственную сессию. Запись требует решения владельца."});
+    engine
+        .request_approval(
+            "visual-fixture",
+            request.clone(),
+            chrono::Utc::now().timestamp(),
+            3600,
+        )
+        .unwrap();
+    engine
+        .park_approval(
+            &request.task_id,
+            request.origin_epoch,
+            "Подготовлен отчёт; ожидается решение владельца.".into(),
+        )
+        .unwrap();
+    engine.pause(true).unwrap();
+    drop(engine);
+    std::fs::create_dir_all(&target).unwrap();
+    std::fs::copy(
+        dir.path().join("state.sqlite3"),
+        target.join("state.sqlite3"),
+    )
+    .unwrap();
+}
+
 #[tokio::test]
 async fn pages_are_stable_and_resource_review_uses_the_original_target() {
     use polymas_core::policy::ApprovalLedger;

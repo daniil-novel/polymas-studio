@@ -659,6 +659,9 @@ code {
 .node-dot.queued {
   background: var(--warning);
 }
+.node-dot.waiting_user {
+  background: var(--warning);
+}
 .data-row,
 .settings-card {
   display: flex;

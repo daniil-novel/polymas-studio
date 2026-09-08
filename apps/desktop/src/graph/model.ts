@@ -75,6 +75,11 @@ export function projectGraph(
   for (const task of tasks) {
     if (['running', 'stopping', 'unknown'].includes(task.state)) states.set(task.assignee, task);
     else if (
+      task.state === 'waiting_user' &&
+      !['running', 'stopping', 'unknown'].includes(states.get(task.assignee)?.state ?? '')
+    )
+      states.set(task.assignee, task);
+    else if (
       task.state === 'queued' &&
       (!states.has(task.assignee) || states.get(task.assignee)?.state === 'waiting')
     )

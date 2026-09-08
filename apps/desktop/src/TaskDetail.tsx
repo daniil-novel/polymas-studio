@@ -57,7 +57,7 @@ export function TaskDetail({
         if (abort.signal.aborted) return;
         setTask(value);
         setError('');
-        if (['queued', 'waiting', 'running', 'stopping'].includes(value.state))
+        if (['queued', 'waiting', 'waiting_user', 'running', 'stopping'].includes(value.state))
           timer = setTimeout(() => void read(), 2000);
       } catch (reason) {
         if (!abort.signal.aborted)
@@ -136,6 +136,15 @@ export function TaskDetail({
             </div>
           )}
           {current.error && <p className="form-error">{current.error}</p>}
+          {current.state === 'waiting_user' && (
+            <div className="task-waiting">
+              <strong>Нужно подтверждение операции</strong>
+              <p>
+                Откройте раздел «Подтверждения», чтобы проверить запрос. Слот исполнителя свободен;
+                после решения продолжится эта же сессия.
+              </p>
+            </div>
+          )}
           {current.state === 'waiting' && current.waiting && (
             <div className="wait-panel" role="status">
               <strong>Ожидание ответа</strong>
@@ -165,7 +174,9 @@ export function TaskDetail({
             <div className="conversation-message assistant-message">
               <div className="result-heading">
                 <span className="message-author">
-                  {current.state === 'waiting' ? 'Промежуточная сводка' : 'Результат агента'}
+                  {['waiting', 'waiting_user'].includes(current.state)
+                    ? 'Промежуточная сводка'
+                    : 'Результат агента'}
                 </span>
                 <button
                   className="icon-button"
@@ -227,7 +238,9 @@ export function TaskDetail({
                 </button>
               </>
             )}
-            {['queued', 'waiting', 'running', 'stopping'].includes(current.state) && (
+            {['queued', 'waiting', 'waiting_user', 'running', 'stopping'].includes(
+              current.state,
+            ) && (
               <button
                 disabled={busy || current.state === 'stopping'}
                 onClick={() => void act('cancel')}
@@ -237,7 +250,9 @@ export function TaskDetail({
               </button>
             )}
             {onContinue &&
-              !['queued', 'waiting', 'running', 'stopping', 'unknown'].includes(current.state) && (
+              !['queued', 'waiting', 'waiting_user', 'running', 'stopping', 'unknown'].includes(
+                current.state,
+              ) && (
                 <button disabled={busy} onClick={() => onContinue(current.assignee)}>
                   Продолжить диалог
                 </button>

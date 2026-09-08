@@ -2,6 +2,7 @@ export type Stored<T> = { revision: number; value: T };
 export type TaskState =
   | 'queued'
   | 'waiting'
+  | 'waiting_user'
   | 'running'
   | 'stopping'
   | 'awaiting_acceptance'
@@ -140,6 +141,7 @@ export interface TaskSummary {
   error: string | null;
 }
 export interface Task extends TaskSummary {
+  approvalWait?: { approvalId: string; originEpoch: number } | null;
   waiting?: { sender: string | null; correlationId: string | null; deadlineAt: number } | null;
   resumeNote?: string | null;
   prompt: string;
@@ -202,6 +204,7 @@ export const stateLabels: Record<string, string> = {
   unknown: 'Нужна сверка',
   archived: 'Архив',
   waiting: 'Ожидает сообщения',
+  waiting_user: 'Ожидает вашего решения',
   stale: 'Нет связи',
 };
 export function agentState(agent: Agent, tasks: TaskSummary[], connected = true): string {
@@ -210,6 +213,8 @@ export function agentState(agent: Agent, tasks: TaskSummary[], connected = true)
     (t) => t.assignee === agent.id && ['running', 'stopping', 'unknown'].includes(t.state),
   );
   if (current) return connected ? current.state : 'stale';
+  if (tasks.some((t) => t.assignee === agent.id && t.state === 'waiting_user'))
+    return 'waiting_user';
   if (tasks.some((t) => t.assignee === agent.id && t.state === 'queued')) return 'queued';
   if (tasks.some((t) => t.assignee === agent.id && t.state === 'waiting')) return 'waiting';
   return 'idle';

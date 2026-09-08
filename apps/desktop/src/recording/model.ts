@@ -37,6 +37,7 @@ const states = new Set([
   'queued',
   'running',
   'waiting',
+  'waiting_user',
   'stopping',
   'awaiting_acceptance',
   'accepted',
@@ -99,7 +100,7 @@ export function recordingFrame(
   const graph = projectGraph(manifest.agents, manifest.architecture, [], pulses, true, time);
   const agentStates = new Map<string, StatePoint>();
   const priority = (state: string) =>
-    ({ running: 5, stopping: 5, unknown: 4, queued: 3, waiting: 2 })[state] ?? 1;
+    ({ running: 6, stopping: 6, unknown: 5, waiting_user: 4, queued: 3, waiting: 2 })[state] ?? 1;
   for (const task of manifest.tasks) {
     const changes = timeline.states.get(task.id) ?? [];
     const index = upperBound(changes, time) - 1;

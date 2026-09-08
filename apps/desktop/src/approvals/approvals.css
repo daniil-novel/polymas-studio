@@ -1,0 +1,198 @@
+.approval-workspace {
+  min-height: 100%;
+  padding: 24px;
+}
+.approval-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.approval-heading h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+  font-size: 26px;
+}
+.approval-heading h1 svg {
+  color: var(--warning);
+}
+.approval-heading p,
+.approval-card header p {
+  color: var(--secondary);
+  margin: 8px 0 0;
+}
+.approval-columns {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.approval-list,
+.approval-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 0;
+}
+.approval-list {
+  padding: 16px;
+}
+.approval-items {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  max-height: 510px;
+  overflow: auto;
+}
+.approval-item {
+  display: grid;
+  justify-content: stretch;
+  justify-items: start;
+  gap: 7px;
+  text-align: left;
+  width: 100%;
+  padding: 14px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.approval-item.selected {
+  border-color: var(--violet);
+  background: #a699f014;
+}
+.approval-state {
+  font-size: 11px;
+  letter-spacing: 0.035em;
+  color: var(--secondary);
+}
+.approval-state.pending,
+.approval-state.unknown {
+  color: var(--warning);
+}
+.approval-state.approved,
+.approval-state.succeeded {
+  color: var(--mint);
+}
+.approval-state.failed {
+  color: var(--error);
+}
+.approval-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.approval-card {
+  padding: 24px;
+}
+.approval-card > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 20px;
+}
+.approval-card > header svg {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+.approval-card h2 {
+  margin: 10px 0;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+.approval-card h3 {
+  font-size: 13px;
+  margin: 22px 0 10px;
+}
+.approval-scope {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  padding: 20px 0 0;
+}
+.approval-scope > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.approval-scope span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.approval-resource,
+.approval-arguments {
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 14px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.approval-arguments {
+  max-height: 290px;
+  min-height: 98px;
+  color: var(--text);
+}
+.approval-resource code {
+  display: block;
+}
+.approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 24px 0;
+}
+.approval-identifiers {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.approval-identifiers dl {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) 2fr;
+  gap: 12px;
+}
+.approval-identifiers dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.approval-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+.approval-empty svg {
+  color: var(--idle);
+  margin-bottom: 14px;
+}
+.approval-empty h3 {
+  color: var(--secondary);
+  font-size: 14px;
+}
+.approval-notice {
+  padding: 12px 16px;
+  background: #6de0b30a;
+  border: 1px solid #6de0b344;
+  border-radius: 7px;
+  color: var(--mint);
+}
+@media (max-width: 1080px) {
+  .approval-columns {
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+  .approval-workspace {
+    padding: 16px;
+  }
+  .approval-card {
+    padding: 18px;
+  }
+}

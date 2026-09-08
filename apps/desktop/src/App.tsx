@@ -16,6 +16,7 @@ import {
   Plus,
   Plug,
   Search,
+  ShieldCheck,
   Settings2,
   Square,
   Terminal,
@@ -35,13 +36,15 @@ import { TasksWorkspace } from './TasksWorkspace';
 import { McpWorkspace } from './McpWorkspace';
 import { KnowledgeWorkspace } from './knowledge/KnowledgeWorkspace';
 import { RecordingWorkspace } from './recording/RecordingWorkspace';
+import { ApprovalWorkspace } from './approvals/ApprovalWorkspace';
 import { agentState, stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
 import './styles.css';
 
 const defaultClient = createClient();
-type Page = 'graph' | 'agents' | 'tasks' | 'knowledge' | 'mcp' | 'events' | 'settings';
+type Page =
+  'graph' | 'agents' | 'tasks' | 'knowledge' | 'mcp' | 'approvals' | 'events' | 'settings';
 export function App({ client = defaultClient }: { client?: ApiClient }) {
   const data = useWorkspace(client);
   const { snapshot, events, connected, error } = data;
@@ -84,6 +87,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
     { id: 'tasks' as const, label: 'Задачи', Icon: Box },
     { id: 'knowledge' as const, label: 'Знания', Icon: BookOpen },
     { id: 'mcp' as const, label: 'MCP', Icon: Plug },
+    { id: 'approvals' as const, label: 'Подтверждения', Icon: ShieldCheck },
     { id: 'events' as const, label: 'События', Icon: Activity },
     { id: 'settings' as const, label: 'Настройки', Icon: Settings2 },
   ];
@@ -239,7 +243,9 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
           <>
             <div
               className="view-toolbar"
-              hidden={page === 'agents' || page === 'mcp' || page === 'knowledge'}
+              hidden={
+                page === 'agents' || page === 'mcp' || page === 'knowledge' || page === 'approvals'
+              }
             >
               <div className="view-heading">
                 <span className="eyebrow">
@@ -331,6 +337,9 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                   <McpWorkspace snapshot={snapshot} command={data.command} />
                 </div>
                 {page === 'knowledge' && <KnowledgeWorkspace client={client} snapshot={snapshot} />}
+                {page === 'approvals' && (
+                  <ApprovalWorkspace client={client} snapshot={snapshot} connected={connected} />
+                )}
                 <div hidden={page !== 'tasks'}>
                   <TasksWorkspace
                     snapshot={snapshot}
@@ -467,7 +476,9 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
             </div>
             <section
               className="timeline"
-              hidden={page === 'agents' || page === 'mcp' || page === 'knowledge'}
+              hidden={
+                page === 'agents' || page === 'mcp' || page === 'knowledge' || page === 'approvals'
+              }
             >
               <div className="timeline-header">
                 <h3>Ход выполнения</h3>

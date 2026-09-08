@@ -5,6 +5,30 @@ import { TaskDetail } from '../../apps/desktop/src/TaskDetail';
 import { ApiClient } from '../../apps/desktop/src/api';
 import type { Task } from '../../apps/desktop/src/types';
 afterEach(cleanup);
+test('owner wait displays a partial result and permits cancellation without starting another dialog', async () => {
+  const client = new ApiClient();
+  vi.spyOn(client, 'request').mockResolvedValue({
+    ...fixture('owner'),
+    state: 'waiting_user',
+    result: 'Ожидаю подтверждение',
+    approvalWait: { approvalId: 'approval', originEpoch: 1 },
+  });
+  render(
+    <TaskDetail
+      taskId="owner"
+      client={client}
+      command={vi.fn()}
+      events={[]}
+      agentName="Агент"
+      onContinue={vi.fn()}
+    />,
+  );
+  expect(await screen.findByText('Ожидает вашего решения')).toBeTruthy();
+  expect(screen.getByText('Промежуточная сводка')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Отменить задачу' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Принять результат' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Продолжить диалог' })).toBeNull();
+});
 test('waiting shows an intermediate summary and a deadline, permits cancellation and refreshes after wake', async () => {
   const client = new ApiClient();
   const waiting = {

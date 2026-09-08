@@ -165,6 +165,7 @@
 }
 .task-state-awaiting_acceptance,
 .task-state-waiting,
+.task-state-waiting_user,
 .task-state-unknown {
   color: var(--warning);
 }
