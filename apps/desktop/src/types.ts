@@ -205,7 +205,7 @@ export const stateLabels: Record<string, string> = {
   archived: 'Архив',
   waiting: 'Ожидает сообщения',
   waiting_user: 'Ожидает вашего решения',
-  stale: 'Нет связи',
+  stale: 'Нет свежих данных',
 };
 export function agentState(agent: Agent, tasks: TaskSummary[], connected = true): string {
   if (agent.status === 'archived') return 'archived';

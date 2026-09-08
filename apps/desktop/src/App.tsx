@@ -37,7 +37,7 @@ import { McpWorkspace } from './McpWorkspace';
 import { KnowledgeWorkspace } from './knowledge/KnowledgeWorkspace';
 import { RecordingWorkspace } from './recording/RecordingWorkspace';
 import { ApprovalWorkspace } from './approvals/ApprovalWorkspace';
-import { agentState, stateLabels } from './types';
+import { stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
 import './styles.css';
@@ -57,20 +57,24 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   const [chatAgentId, setChatAgentId] = useState<string | null>(null);
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [returnRunId, setReturnRunId] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [, tickClock] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const timer = setInterval(() => tickClock((value) => value + 1), 1000);
     return () => clearInterval(timer);
   }, []);
+  // Every incoming event uses current time; periodic renders also expire idle observations.
+  const now = Date.now();
   const config = snapshot?.config.value;
   const agents = config?.registry.agents.filter((a) => a.status !== 'archived') ?? [];
   const selected = agents.find((a) => a.id === selectedId);
-  const running = agents.filter(
-    (a) => agentState(a, snapshot?.tasks ?? [], connected) === 'running',
-  ).length;
   const projection = config
     ? projectGraph(agents, config.architecture, snapshot?.tasks ?? [], events, connected, now)
     : null;
+  const running =
+    projection?.nodes.filter((node) => node.kind === 'agent' && node.active).length ?? 0;
+  const selectedState = projection?.nodes.find((node) => node.id === selectedId)?.state ?? 'idle';
+  const canStop =
+    snapshot?.tasks.some((task) => ['running', 'stopping'].includes(task.state)) ?? false;
   const act = async (action: string) => {
     setBusy(true);
     try {
@@ -143,7 +147,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
           {snapshot?.paused ? <Play size={14} /> : <Pause size={14} />}{' '}
           {snapshot?.paused ? 'Продолжить' : 'Пауза'}
         </button>
-        <button disabled={!connected || busy || running === 0} onClick={() => void act('stop_all')}>
+        <button disabled={!connected || busy || !canStop} onClick={() => void act('stop_all')}>
           <Square size={13} />
           Остановить
         </button>
@@ -412,11 +416,9 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                     <>
                       <div className="inspector-title">
                         <h2>{selected.name}</h2>
-                        <span
-                          className={`status-text ${agentState(selected, snapshot.tasks, connected)}`}
-                        >
+                        <span className={`status-text ${selectedState}`}>
                           <i className="dot" />
-                          {stateLabels[agentState(selected, snapshot.tasks, connected)]}
+                          {stateLabels[selectedState]}
                         </span>
                         <code>{selected.id.slice(-12)}</code>
                       </div>
