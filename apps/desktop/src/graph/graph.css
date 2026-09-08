@@ -1,0 +1,137 @@
+.graph-workbench {
+  position: absolute;
+  inset: 52px 0 0;
+}
+.graph-stage:has(.graph-agent-list) > .graph-legend {
+  display: none;
+}
+.graph-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+}
+.graph-controls button {
+  font-size: 12px;
+  min-height: 30px;
+  background: var(--panel);
+}
+.graph-controls button[aria-pressed='true'] {
+  background: #223833;
+  color: var(--mint);
+  border-color: #36574c;
+}
+.graph-controls > span {
+  margin-left: auto;
+}
+.segmented {
+  display: flex;
+  gap: 0;
+}
+.segmented button {
+  border-radius: 0;
+}
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.sigma-host {
+  position: absolute;
+  inset: 40px 0 0;
+  overflow: hidden;
+}
+.graph-effects {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.graph-minimap {
+  position: absolute;
+  width: 144px;
+  height: 88px;
+  right: 18px;
+  bottom: 58px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #141b23e8;
+  pointer-events: none;
+}
+.graph-camera {
+  display: flex;
+  gap: 5px;
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+}
+.graph-camera button {
+  padding: 7px;
+  min-width: 32px;
+  background: var(--panel);
+}
+.graph-agent-list {
+  position: absolute;
+  inset: 44px 16px 0;
+  overflow: auto;
+  padding-bottom: 16px;
+}
+.graph-list-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50px;
+  display: flex;
+  width: 100%;
+  justify-content: flex-start;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+.graph-list-row strong {
+  flex: 1;
+  text-align: left;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graph-list-row code {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.graph-list-row span {
+  color: var(--secondary);
+}
+.graph-list-row.selected {
+  border-color: var(--mint);
+}
+.graph-fallback {
+  position: absolute;
+  top: 55px;
+  left: 24px;
+  right: 24px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.graph-no-results {
+  position: absolute;
+  top: 45%;
+  width: 100%;
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
+}

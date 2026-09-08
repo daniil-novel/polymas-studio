@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Activity,
   Box,
@@ -23,7 +23,9 @@ import {
 import { ApiClient, createClient } from './api';
 import { useWorkspace } from './useWorkspace';
 import { RoleEditor } from './RoleEditor';
-import { agentState, stateLabels, type Agent } from './types';
+import { agentState, stateLabels } from './types';
+import { GraphView } from './graph/GraphView';
+import { projectGraph } from './graph/model';
 import './styles.css';
 
 const defaultClient = createClient();
@@ -36,15 +38,20 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState('');
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const config = snapshot?.config.value;
   const agents = config?.registry.agents.filter((a) => a.status !== 'archived') ?? [];
   const selected = agents.find((a) => a.id === selectedId);
   const running = agents.filter(
     (a) => agentState(a, snapshot?.tasks ?? [], connected) === 'running',
   ).length;
-  const filtered = agents.filter((a) =>
-    `${a.name} ${a.id}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-  );
+  const projection = config
+    ? projectGraph(agents, config.architecture, snapshot?.tasks ?? [], events, connected, now)
+    : null;
   const act = async (action: string) => {
     setBusy(true);
     try {
@@ -62,10 +69,6 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
     { id: 'events' as const, label: 'События', Icon: Activity },
     { id: 'settings' as const, label: 'Настройки', Icon: Settings2 },
   ];
-  function select(agent: Agent) {
-    setSelectedId(agent.id);
-    setPage('graph');
-  }
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -252,23 +255,19 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                         </button>
                       </div>
                     ) : (
-                      <div className="agent-grid">
-                        {filtered.map((a) => (
-                          <button
-                            key={a.id}
-                            onClick={() => select(a)}
-                            className={`agent-card ${selectedId === a.id ? 'selected' : ''}`}
-                          >
-                            <span
-                              className={`node-dot ${agentState(a, snapshot.tasks, connected)}`}
-                            />
-                            <strong>{a.name}</strong>
-                            <span className="small muted">
-                              {stateLabels[agentState(a, snapshot.tasks, connected)]}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
+                      projection && (
+                        <GraphView
+                          projection={projection}
+                          pinned={snapshot.config.value.architecture.positions}
+                          selectedId={selectedId}
+                          onSelect={setSelectedId}
+                          query={query}
+                          groupLabels={Object.fromEntries([
+                            ...snapshot.config.value.registry.roles.map((r) => [r.id, r.name]),
+                            ...snapshot.config.value.architecture.holons.map((h) => [h.id, h.name]),
+                          ])}
+                        />
+                      )
                     )}
                     <div className="graph-legend">
                       <span>
