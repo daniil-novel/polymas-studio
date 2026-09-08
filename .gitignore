@@ -5,3 +5,16 @@ node_modules/
 .env.*
 !.env.example
 tmp/
+target/
+dist/
+coverage/
+test-results/
+playwright-report/
+*.log
+*.db
+*.db-shm
+*.db-wal
+*.pdb
+*.tsbuildinfo
+apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/gen/
