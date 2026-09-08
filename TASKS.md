@@ -62,6 +62,7 @@
   - [x] D19a. Подготовка знаний к редактору: atomic idempotent commands, CAS проверки, ограниченные страницы и поиск; HTTP/UI/gateway далее.
   - [x] D19b. Owner API знаний и карточка происхождения; отсутствие общей памяти не скрывает сохранённые данные владельца. UI/gateway далее.
   - [x] D19c. Трёхпанельный редактор источников/утверждений/provenance, проверка, связи и страницы; CU на настоящем daemon. Knowledge graph/indexing/gateway и replay далее.
+  - [x] D19d. Storage projection для агентского чтения: обязательный namespace, конкретный connection и проверка обеих сторон связи до limit; gateway далее.
 - [ ] D20. Масштабирование по правилам и ресурсные ограничения.
 - [ ] D21. Удалённые workers, enrollment, fencing и кластерный storage.
 - [ ] D22. Реальные Codex smoke/resume/concurrency и failure tests.

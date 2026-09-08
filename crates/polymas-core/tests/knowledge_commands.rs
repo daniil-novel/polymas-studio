@@ -196,3 +196,88 @@ fn text_search_matches_cyrillic_case_and_treats_percent_as_literal() {
             .is_empty()
     );
 }
+
+#[test]
+fn scoped_memory_pages_filter_source_connections_before_limiting_claims_and_links() {
+    let mut db = Store::memory().unwrap();
+    let mut visible = vec![];
+    let mut hidden = None;
+    for i in 0..8 {
+        let connection = if i % 3 == 0 {
+            "shared-connection"
+        } else {
+            "private-connection"
+        };
+        let source = execute(
+            &mut db,
+            &format!("s{i}"),
+            json!({"action":"add_source","draft":{"name":format!("source {i}"),"uri":"https://example.org/spec","version":"fixture-v1","namespace":"shared","connectionId":connection,"retentionDays":30}}),
+        );
+        let claim = execute(
+            &mut db,
+            &format!("c{i}"),
+            json!({"action":"publish","draft":{"assertion":format!("assertion {i}"),"sourceId":source["id"],"namespace":"shared"}}),
+        );
+        if connection == "shared-connection" {
+            visible.push(claim["id"].as_str().unwrap().to_string());
+        } else {
+            hidden = Some(claim["id"].as_str().unwrap().to_string());
+        }
+    }
+    execute(
+        &mut db,
+        "visible-link",
+        json!({"action":"relate","from":visible[0],"to":visible[1],"relation":"supports"}),
+    );
+    execute(
+        &mut db,
+        "hidden-link",
+        json!({"action":"relate","from":visible[0],"to":hidden,"relation":"contradicts"}),
+    );
+    let mut query = KnowledgeQuery {
+        namespace: Some("shared".into()),
+        limit: 1,
+        ..Default::default()
+    };
+    let mut found = vec![];
+    loop {
+        let page = Knowledge::page_for_connection(
+            &db,
+            KnowledgeView::Claims,
+            &query,
+            101,
+            "shared-connection",
+        )
+        .unwrap();
+        found.extend(
+            page.items
+                .into_iter()
+                .map(|i| i.value["id"].as_str().unwrap().to_string()),
+        );
+        query.cursor = page.next_cursor;
+        if query.cursor.is_none() {
+            break;
+        }
+    }
+    found.sort();
+    visible.sort();
+    assert_eq!(found, visible);
+    query.cursor = None;
+    query.limit = 100;
+    let links =
+        Knowledge::page_for_connection(&db, KnowledgeView::Links, &query, 101, "shared-connection")
+            .unwrap();
+    assert_eq!(links.items.len(), 1);
+    assert_eq!(links.items[0].value["relation"], "supports");
+    query.namespace = None;
+    assert!(
+        Knowledge::page_for_connection(
+            &db,
+            KnowledgeView::Claims,
+            &query,
+            101,
+            "shared-connection"
+        )
+        .is_err()
+    );
+}
