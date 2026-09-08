@@ -169,3 +169,5 @@ python scripts/smoke_service.py --allow-provider
 ## Выпуск
 
 Выпуск требует закрытия обязательных сценариев [плана приёмки](specs/05-delivery-and-acceptance.md), финального self-review, измерений и подписанного installer. Реальные Neo4j, C=1000/8-часовой soak, Windows 11 и native screenshot/close остаются явно отделёнными от unit/fixture проверок. Репозиторий частный; правовой статус указан в [LICENSE](LICENSE).
+
+Браузерная регрессия раскладки: `npx playwright install chromium`, затем `npm run test:e2e`. Она поднимает отдельный UI на порту 1432 и использует только авторские API-fixtures; рабочая служба, секреты и модель в этой проверке не используются. CI выполняет её отдельным заданием и сохраняет trace при ошибке.

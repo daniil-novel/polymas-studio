@@ -241,3 +241,11 @@
     padding: 18px;
   }
 }
+@media (max-width: 1000px) {
+  .approval-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .approval-items {
+    max-height: 170px;
+  }
+}

@@ -782,6 +782,14 @@ button svg {
     height: 150px;
   }
 }
+@media (max-width: 760px) {
+  .app-shell {
+    min-width: 0;
+  }
+  .live-counts {
+    display: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *:before,
