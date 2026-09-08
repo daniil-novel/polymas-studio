@@ -147,6 +147,8 @@ export interface Task extends TaskSummary {
   newSession: boolean;
 }
 export interface Run {
+  completion:
+    { type: 'all_required' | 'manual' | 'first_accepted' } | { type: 'quorum'; required: number };
   id: string;
   title: string;
   createdAt: string;

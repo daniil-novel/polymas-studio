@@ -8,6 +8,76 @@ use polymas_daemon::{AppState, router};
 use serde_json::json;
 use tower::ServiceExt;
 #[tokio::test]
+async fn run_summaries_expose_the_pinned_completion_rule() {
+    use polymas_core::{
+        registry::{BatchRequest, RoleDraft},
+        scheduler::{CompletionRule, TaskInput},
+        workspace::ConfigCommand,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let mut engine = Engine::open(dir.path()).unwrap();
+    let role = engine
+        .configure(
+            1,
+            ConfigCommand::CreateRole {
+                draft: RoleDraft {
+                    name: "Role".into(),
+                    instruction: "Test".into(),
+                    ..Default::default()
+                },
+            },
+        )
+        .unwrap();
+    engine
+        .configure(
+            2,
+            ConfigCommand::CreateAgents {
+                key: "batch".into(),
+                request: BatchRequest {
+                    role_id: role["id"].as_str().unwrap().into(),
+                    role_version: 1,
+                    count: 1,
+                    name_pattern: "Agent {n}".into(),
+                },
+            },
+        )
+        .unwrap();
+    engine
+        .submit(
+            "run",
+            TaskInput {
+                title: "Manual".into(),
+                prompt: "Test".into(),
+                completion: CompletionRule::Manual,
+                ..Default::default()
+            },
+            1,
+        )
+        .unwrap();
+    let state = AppState::new(
+        engine,
+        "test-token-at-least-32-characters-long".into(),
+        vec![],
+    )
+    .unwrap();
+    let response = router(state)
+        .oneshot(
+            Request::builder()
+                .uri("/api/state")
+                .header(
+                    "authorization",
+                    "Bearer test-token-at-least-32-characters-long",
+                )
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(value["runs"][0]["completion"]["type"], "manual");
+}
+#[tokio::test]
 async fn control_plane_rejects_missing_token_and_foreign_origin_before_reading_state() {
     let dir = tempfile::tempdir().unwrap();
     let state = AppState::new(

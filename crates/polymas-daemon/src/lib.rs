@@ -125,7 +125,7 @@ async fn snapshot(State(state): State<AppState>) -> std::result::Result<Json<Val
             .db
             .list::<runtime::AgentRuntime>("agent_runtime", 5000)?,
     )?;
-    value["runs"]=json!(engine.scheduler.runs.iter().rev().take(100).map(|r| json!({"id":r.id,"title":r.title,"createdAt":r.created_at,"accepted":r.accepted,"stopped":r.stopped,"taskIds":r.task_ids,"configRevision":r.config_revision})).collect::<Vec<_>>());
+    value["runs"]=json!(engine.scheduler.runs.iter().rev().take(100).map(|r| json!({"id":r.id,"title":r.title,"createdAt":r.created_at,"accepted":r.accepted,"stopped":r.stopped,"taskIds":r.task_ids,"configRevision":r.config_revision,"completion":r.input.completion})).collect::<Vec<_>>());
     value["taskCount"] = json!(engine.scheduler.tasks.len());
     value["tasks"]=json!(engine.scheduler.tasks.iter().rev().take(1000).map(|t| json!({"id":t.id,"runId":t.run_id,"assignee":t.assignee,"state":t.state,"attempt":t.attempt,"lease":t.lease,"createdAt":t.created_at,"completedAt":t.completed_at,"artifactIds":t.artifact_ids,"error":t.error})).collect::<Vec<_>>());
     Ok(Json(value))

@@ -27,6 +27,7 @@ import { RoleEditor } from './RoleEditor';
 import { ArchitectureEditor } from './ArchitectureEditor';
 import { Modal } from './Modal';
 import { TaskComposer } from './TaskComposer';
+import { TasksWorkspace } from './TasksWorkspace';
 import { agentState, stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
@@ -300,30 +301,15 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                 <div hidden={page !== 'agents'}>
                   <RoleEditor snapshot={snapshot} command={data.command} />
                 </div>
-                {page === 'tasks' && (
-                  <>
-                    <h2>Задачи системы</h2>
-                    <TaskComposer snapshot={snapshot} command={data.command} />
-                    <h3 className="run-list-heading">Последние запуски</h3>
-                    {snapshot.runs.length === 0 ? (
-                      <p className="muted">Запуски появятся после отправки задачи.</p>
-                    ) : (
-                      snapshot.runs.map((r) => (
-                        <div className="data-row" key={r.id}>
-                          <Box size={17} />
-                          <strong>{r.title}</strong>
-                          <span className="badge">
-                            {r.accepted
-                              ? 'Принят'
-                              : r.stopped
-                                ? 'Остановлен'
-                                : `${r.taskIds.length} задач`}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </>
-                )}
+                <div hidden={page !== 'tasks'}>
+                  <TasksWorkspace
+                    snapshot={snapshot}
+                    events={events}
+                    client={client}
+                    command={data.command}
+                    onContinue={setChatAgentId}
+                  />
+                </div>
                 {page === 'events' && (
                   <>
                     <h2>Журнал событий</h2>

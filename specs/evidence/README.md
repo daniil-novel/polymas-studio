@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D17b: RED TaskDetail import; GREEN результат не принимается автоматически, action адресован точному taskId, поздний ответ старой карточки не отображается в новой. HTTP RED missing completion → GREEN pinned completion rule в summary. 20 UI tests + 5 daemon tests + TS/lint/build/clippy. Computer use: реальный Codex PID 25408 вернул POLYMAS-UI-42, видны критерий и 1 artifact; нажатие «Принять результат» изменило задачу и запуск на «Принят». После graceful shutdown/restart данные сохранены. Windows build lock устранён запуском отдельной копии dev binary, не отключением проверок.
+
 D17a: RED TaskComposer import; GREEN exact agent target, сохранение idempotency key после неопределённого сетевого исхода, изоляция черновиков адресатов, recursive holon dispatch. 18 UI tests + TS/lint/build. Computer use: один запрос «POLYMAS-UI-42» отправлен через форму реальному Codex; наблюдены runtime.session/turn_started/heartbeat, счётчик running=1 и свечение только нужного узла. Три холона после исправления раскладки отображаются раздельно; активность рёбер не выдумана. Проверка результата/приёмки следует с соответствующей формой.
 
 D16 layout fix: RED stablePositions отсутствует; GREEN перенесённый узел освобождает automatic position, неизменённая группа остаётся на месте, explicit pinned имеет приоритет. Сценарий добавлен после наблюдаемого пересечения групп в computer use.
