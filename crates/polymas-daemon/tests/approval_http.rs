@@ -11,6 +11,97 @@ use tower::ServiceExt;
 const TOKEN: &str = "approval-owner-fixture-token-32-characters";
 
 #[tokio::test]
+async fn owner_reads_saved_result_pages_after_attempt_closes_without_leaking_them_in_lists() {
+    use polymas_core::policy::{ApprovalLedger, ApprovalState};
+    let (_dir, mut engine, request) = fixture::setup();
+    let now = chrono::Utc::now().timestamp();
+    let approval = engine
+        .request_approval("result-fixture", request.clone(), now, 60)
+        .unwrap();
+    engine
+        .park_approval(&request.task_id, request.origin_epoch, "Wait".into())
+        .unwrap();
+    engine
+        .decide_approval(&approval.id, 1, &approval.fingerprint, true, now)
+        .unwrap();
+    engine.wake_approvals(now).unwrap();
+    let task = engine.claim(1, "local", now).unwrap().remove(0);
+    let epoch = task.lease.as_ref().unwrap().epoch;
+    engine
+        .consume_approval(&task.id, epoch, &approval.id, now)
+        .unwrap();
+    let result = json!({"response":{"text":"PRIVATE-RESULT-\"\\🧠".repeat(3000)}});
+    ApprovalLedger::complete_with_result(
+        &mut engine.workspace.db,
+        &approval.id,
+        ApprovalState::Succeeded,
+        Some(result.clone()),
+    )
+    .unwrap();
+    let state = AppState::new(engine, TOKEN.into(), vec![]).unwrap();
+    let grant = polymas_daemon::gateway::issue(&state, &task.id)
+        .await
+        .unwrap();
+    let path = format!("/api/approvals/{}/result", approval.id);
+    assert_eq!(
+        call(&state, &path, None, grant.token.expose()).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    state
+        .engine
+        .lock()
+        .await
+        .finish(&task.id, epoch, Ok("Model finished".into()))
+        .unwrap();
+    let head = state
+        .engine
+        .lock()
+        .await
+        .workspace
+        .db
+        .last_sequence()
+        .unwrap();
+    let (status, first) = call(&state, &path, None, TOKEN).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(first["chunk"].as_str().unwrap().len() <= 32768);
+    let (_, detail) = call(
+        &state,
+        &format!("/api/approvals/{}", approval.id),
+        None,
+        TOKEN,
+    )
+    .await;
+    assert_eq!(detail["resultMetadata"], first["metadata"]);
+    assert!(!detail.to_string().contains("PRIVATE-RESULT"));
+    let mut text = first["chunk"].as_str().unwrap().to_owned();
+    let mut next = first["nextOffset"].as_u64();
+    while let Some(offset) = next {
+        let (status, page) = call(&state, &format!("{path}?offset={offset}"), None, TOKEN).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(page["metadata"], first["metadata"]);
+        text.push_str(page["chunk"].as_str().unwrap());
+        next = page["nextOffset"].as_u64();
+    }
+    assert_eq!(serde_json::from_str::<Value>(&text).unwrap(), result);
+    assert_eq!(
+        call(&state, &format!("{path}?limit=32769"), None, TOKEN)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        call(&state, "/api/approvals/missing/result", None, TOKEN)
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    let (_, list) = call(&state, "/api/approvals", None, TOKEN).await;
+    assert!(!list.to_string().contains("PRIVATE-RESULT"));
+    let engine = state.engine.lock().await;
+    assert_eq!(engine.workspace.db.last_sequence().unwrap(), head);
+}
+
+#[tokio::test]
 async fn only_the_owner_can_record_an_unknown_outcome_without_sending_a_new_call() {
     use polymas_core::policy::{ApprovalLedger, ApprovalState};
     let (_dir, mut engine, request) = fixture::setup();

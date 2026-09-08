@@ -23,7 +23,10 @@ for line in sys.stdin:
             sys.exit(0)
         if mode == "slow":
             time.sleep(60)
-        result = {"content": [{"type": "text", "text": "WROTE:" + arguments["text"]}], "isError": mode == "error"}
+        text = "WROTE:" + arguments["text"]
+        if mode == "large":
+            text += "🧠\\\n" * 90000
+        result = {"content": [{"type": "text", "text": text}], "isError": mode == "error"}
     elif method == "ping":
         result = {}
     else:

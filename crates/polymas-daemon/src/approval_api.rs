@@ -6,7 +6,10 @@ use axum::{
 };
 use polymas_core::{
     error::Error,
-    policy::{Approval, ApprovalLedger, ApprovalPage, ApprovalQuery, ApprovalState},
+    policy::{
+        Approval, ApprovalLedger, ApprovalPage, ApprovalQuery, ApprovalState, ResultPage,
+        ResultQuery,
+    },
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -15,8 +18,19 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/approvals", get(list))
         .route("/api/approvals/{id}", get(detail))
+        .route("/api/approvals/{id}/result", get(result_page))
         .route("/api/approvals/{id}/decision", post(decide))
         .route("/api/approvals/{id}/reconcile", post(reconcile))
+}
+async fn result_page(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(query): Query<ResultQuery>,
+) -> Result<Json<ResultPage>, ApiError> {
+    let engine = state.engine.lock().await;
+    let document = ApprovalLedger::result(&engine.workspace.db, &id)?
+        .ok_or_else(|| Error::NotFound("Сохранённый ответ операции отсутствует".into()))?;
+    Ok(Json(document.page(query)?))
 }
 async fn list(
     State(state): State<AppState>,
@@ -48,6 +62,8 @@ async fn detail(
         .get::<Value>("approval_resources", &id)?
         .map(|s| s.value);
     let timestamp = chrono::Utc::now().timestamp();
+    let result = ApprovalLedger::result(&engine.workspace.db, &id)?;
+    let result_metadata = result.as_ref().map(|document| document.metadata());
     let reconciliation = engine
         .workspace
         .db
@@ -58,7 +74,7 @@ async fn detail(
         .check_approval_decision(&approval.value, false, timestamp)
         .is_ok();
     Ok(Json(
-        json!({"approval":approval,"connection":connection,"reconciliation":reconciliation,"canApprove":permission.is_ok(),"canDeny":can_deny,
+        json!({"approval":approval,"connection":connection,"reconciliation":reconciliation,"resultMetadata":result_metadata,"canApprove":permission.is_ok(),"canDeny":can_deny,
         "unavailableReason":permission.err().map(|e| polymas_core::process::redact(&e.to_string()))}),
     ))
 }

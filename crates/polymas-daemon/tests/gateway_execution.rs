@@ -125,6 +125,17 @@ async fn setup(
         true,
         "Even approved original turn cannot execute"
     );
+    assert_eq!(
+        call(
+            &state,
+            &origin,
+            "polymas_read_operation_result",
+            json!({"approvalId":id})
+        )
+        .await["isError"],
+        true,
+        "Original turn cannot read a continuation result"
+    );
     let mut engine = state.engine.lock().await;
     engine
         .park_approval(
@@ -147,6 +158,86 @@ async fn setup(
     let grant = issue(&state, &request.task_id).await.unwrap();
     (dir, state, request, grant, approval, target)
 }
+#[tokio::test]
+async fn large_external_results_are_read_in_scoped_pages_without_resending_the_write() {
+    use sha2::{Digest, Sha256};
+    let (_dir, state, _, grant, approval, target) = setup("large").await;
+    let input = json!({"approvalId":approval.id});
+    let raw = call(&state, &grant, "polymas_execute_operation", input.clone()).await;
+    assert!(
+        raw.to_string().len() < 65536,
+        "Execution receipt must fit the bridge"
+    );
+    let receipt = content(&raw);
+    assert_eq!(receipt["state"], "succeeded");
+    assert!(receipt["result"].is_null());
+    assert!(receipt["resultMetadata"]["byteLength"].as_u64().unwrap() > 65536);
+    let mut text = String::new();
+    let mut offset = 0;
+    loop {
+        let raw = call(
+            &state,
+            &grant,
+            "polymas_read_operation_result",
+            json!({"approvalId":approval.id,"offset":offset}),
+        )
+        .await;
+        assert!(raw.to_string().len() < 256 * 1024);
+        let page = content(&raw);
+        assert_eq!(page["metadata"], receipt["resultMetadata"]);
+        assert_eq!(page["offset"], offset);
+        text.push_str(page["chunk"].as_str().unwrap());
+        if let Some(next) = page["nextOffset"].as_u64() {
+            offset = next;
+        } else {
+            break;
+        }
+    }
+    assert_eq!(
+        receipt["resultMetadata"]["sha256"],
+        format!("{:x}", Sha256::digest(text.as_bytes()))
+    );
+    let result: Value = serde_json::from_str(&text).unwrap();
+    assert!(
+        result["response"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .ends_with(&"🧠\\\n".repeat(90000))
+    );
+    let again = content(&call(&state, &grant, "polymas_execute_operation", input.clone()).await);
+    assert_eq!(again, receipt);
+    assert_eq!(std::fs::read_to_string(&target).unwrap().lines().count(), 1);
+    for invalid in [
+        json!({"approvalId":"foreign"}),
+        json!({"approvalId":approval.id,"limit":32769}),
+        json!({"approvalId":approval.id,"epoch":approval.operation.epoch}),
+    ] {
+        assert_eq!(
+            call(&state, &grant, "polymas_read_operation_result", invalid).await["isError"],
+            true
+        );
+    }
+    let mut engine = state.engine.lock().await;
+    let revision = engine.workspace.config().revision;
+    engine
+        .configure(revision, ConfigCommand::SetBindings { bindings: vec![] })
+        .unwrap();
+    drop(engine);
+    assert_eq!(
+        call(
+            &state,
+            &grant,
+            "polymas_read_operation_result",
+            input.clone()
+        )
+        .await["isError"],
+        true
+    );
+    let status = content(&call(&state, &grant, "polymas_operation_status", input).await);
+    assert!(status["resultMetadata"].is_null() && status["result"].is_null());
+    assert_eq!(std::fs::read_to_string(target).unwrap().lines().count(), 1);
+}
+
 #[tokio::test]
 async fn an_unresolved_execution_cannot_be_replaced_by_another_request_or_wait() {
     let (_dir, state, request, grant, approval, _) = setup("disconnect").await;
