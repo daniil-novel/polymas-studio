@@ -3,6 +3,8 @@ import { Copy } from 'lucide-react';
 import { stateLabels, type Agent, type Snapshot } from './types';
 import type { GraphNode } from './graph/model';
 import './instances.css';
+import { AgentNameEditor, type RefreshWorkspace } from './AgentNameEditor';
+import type { Command } from './RoleEditor';
 
 interface Row {
   agent: Agent;
@@ -20,14 +22,22 @@ export function AgentDirectory({
   snapshot,
   roleId,
   nodes,
+  refresh,
+  command,
+  connected,
 }: {
   snapshot: Snapshot;
   roleId: string;
   nodes: GraphNode[];
+  refresh?: RefreshWorkspace;
+  command: Command;
+  connected: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [state, setState] = useState('active');
   const [order, setOrder] = useState('name-asc');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const rows = useMemo(() => {
     const config = snapshot.config.value;
     const states = new Map(nodes.map((node) => [node.id, node.state]));
@@ -122,12 +132,43 @@ export function AgentDirectory({
           </select>
         </label>
       </div>
-      <InstanceRows key={JSON.stringify([roleId, query, state, order])} rows={rows} />
+      <InstanceRows
+        key={JSON.stringify([roleId, query, state, order])}
+        rows={rows}
+        onRename={
+          refresh
+            ? (id) => {
+                setSaved(false);
+                setEditingId(id);
+              }
+            : undefined
+        }
+      />
+      {saved && (
+        <p role="status" className="form-success">
+          Имя экземпляра сохранено
+        </p>
+      )}
+      {editingId && refresh && (
+        <AgentNameEditor
+          key={editingId}
+          agentId={editingId}
+          snapshot={snapshot}
+          connected={connected}
+          refresh={refresh}
+          command={command}
+          onClose={() => setEditingId(null)}
+          onSaved={() => {
+            setSaved(true);
+            setEditingId(null);
+          }}
+        />
+      )}
     </section>
   );
 }
 
-function InstanceRows({ rows }: { rows: Row[] }) {
+function InstanceRows({ rows, onRename }: { rows: Row[]; onRename?: (id: string) => void }) {
   const viewport = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(540);
@@ -218,7 +259,17 @@ function InstanceRows({ rows }: { rows: Row[] }) {
                 <td title={row.agent.name}>
                   <span className="instance-name">
                     <i className={`dot ${row.state}`} />
-                    {row.agent.name}
+                    {onRename ? (
+                      <button
+                        className="instance-name-button"
+                        aria-label={`Переименовать ${row.agent.name}`}
+                        onClick={() => onRename(row.agent.id)}
+                      >
+                        {row.agent.name}
+                      </button>
+                    ) : (
+                      row.agent.name
+                    )}
                   </span>
                 </td>
                 <td title={row.agent.id}>

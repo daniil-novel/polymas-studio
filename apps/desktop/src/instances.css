@@ -78,6 +78,32 @@
 .instance-name .dot {
   margin-right: 9px;
 }
+.instance-name-button {
+  display: inline;
+  background: transparent;
+  padding: 0;
+  border: 0;
+  min-height: 30px;
+  font-size: inherit;
+  text-align: left;
+}
+.instance-name-button:hover {
+  color: var(--mint);
+  text-decoration: underline;
+}
+.agent-name-editor {
+  width: 100%;
+  padding: 24px;
+}
+.editor-modal.agent-name-modal {
+  width: min(560px, calc(100vw - 48px));
+}
+.agent-name-editor label {
+  margin-top: 16px;
+}
+.agent-name-editor .dialog-actions {
+  flex-wrap: wrap;
+}
 .instance-pager {
   justify-content: flex-end;
   flex-wrap: wrap;

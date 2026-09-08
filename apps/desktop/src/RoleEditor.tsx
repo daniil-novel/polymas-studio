@@ -3,6 +3,7 @@ import { Check, ChevronRight, FileText, Plus, Save, Shield, Terminal, Users } fr
 import type { Role, RoleDraft, Snapshot } from './types';
 import type { GraphNode } from './graph/model';
 import { AgentDirectory } from './AgentDirectory';
+import type { RefreshWorkspace } from './AgentNameEditor';
 import './roles.css';
 export type Command = (path: string, body: unknown) => Promise<unknown>;
 const blank: RoleDraft = {
@@ -27,10 +28,14 @@ export function RoleEditor({
   snapshot,
   command,
   nodes = [],
+  refresh,
+  connected = false,
 }: {
   snapshot: Snapshot;
   command: Command;
   nodes?: GraphNode[];
+  refresh?: RefreshWorkspace;
+  connected?: boolean;
 }) {
   const [roleId, setRoleId] = useState('');
   const [baseVersion, setBaseVersion] = useState(0);
@@ -476,7 +481,14 @@ export function RoleEditor({
           </footer>
         </>
       ) : (
-        <AgentDirectory snapshot={snapshot} roleId={roleId} nodes={nodes} />
+        <AgentDirectory
+          snapshot={snapshot}
+          roleId={roleId}
+          nodes={nodes}
+          command={command}
+          refresh={refresh}
+          connected={connected}
+        />
       )}
       {pendingRole !== null && (
         <div className="dialog-backdrop">

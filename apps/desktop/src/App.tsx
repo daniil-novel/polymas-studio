@@ -406,6 +406,8 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                     snapshot={snapshot}
                     command={data.command}
                     nodes={projection?.nodes ?? []}
+                    refresh={data.refresh}
+                    connected={connected}
                   />
                 </div>
                 <div hidden={page !== 'mcp'}>

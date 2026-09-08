@@ -70,6 +70,7 @@
   - [x] D14h. Frontend lifecycle dialog и reconnect для native startup; Tauri commands и visual native verification далее.
   - [x] D14i. Tauri shell, IPC ACL, tray, single instance, staging/build; standalone process и real OS vault smoke. Native visual/close-through-window gate остаётся открытым из-за недоступного Windows CU helper; capacity/workspace/settings и installer drain далее.
 - [ ] D15. Формы ролей и массового создания экземпляров.
+  - [x] D15d. Переименование точного экземпляра через owner CAS: свежий read, stale/disconnect/uncertain guard, UTF-8 limit, сохранение identity/history; Chromium save/reload/Escape и CU настоящей службы с возвратом исходного имени.
   - [x] D15c. Виртуализированный каталог экземпляров: поиск имени/ID, фильтр роли/состояния/архива, сортировка, текущая task/worker и состояния общей graph projection. 5000 authored definitions проверены в Chromium, CU 1280/736; действия экземпляров, выбор и настройка колонок далее.
   - [x] D15b. Форма архитектуры и холонов с сохранением через ревизии; ресурсные scaling rules далее в D20.
   - [x] D15a. Роль, новая версия, массовое создание, список экземпляров и stale-form guard; расширенные действия экземпляров далее.

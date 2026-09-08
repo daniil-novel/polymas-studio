@@ -3,10 +3,12 @@ export function Modal({
   children,
   label,
   onClose,
+  className = '',
 }: {
   children: ReactNode;
   label: string;
   onClose: () => void;
+  className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const latest = useRef(onClose);
@@ -24,7 +26,7 @@ export function Modal({
   }, []);
   return (
     <dialog
-      className="editor-modal"
+      className={`editor-modal ${className}`}
       ref={dialog}
       aria-label={label}
       onCancel={(e) => {
