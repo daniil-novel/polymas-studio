@@ -112,6 +112,13 @@ pub fn authorize_tool(
 pub struct Operation {
     pub agent_id: String,
     pub task_id: String,
+    // Old persisted approvals remain readable, but cannot authorize unscoped work.
+    #[serde(default)]
+    pub run_id: String,
+    #[serde(default)]
+    pub namespace: String,
+    #[serde(default)]
+    pub resource_scope_hash: String,
     pub epoch: u64,
     pub connection_id: String,
     pub connection_revision: i64,
@@ -127,6 +134,7 @@ impl Operation {
         for value in [
             &self.agent_id,
             &self.task_id,
+            &self.run_id,
             &self.connection_id,
             &self.tool,
         ] {
@@ -135,6 +143,23 @@ impl Operation {
                 "Некорректный идентификатор операции",
             )?;
         }
+        require(
+            !self.namespace.is_empty()
+                && self.namespace.len() <= 120
+                && self
+                    .namespace
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || "_-./".contains(c)),
+            "Операция требует конкретного namespace",
+        )?;
+        require(
+            self.resource_scope_hash.len() == 64
+                && self
+                    .resource_scope_hash
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+            "Операция требует hash области ресурса",
+        )?;
         require(self.arguments.is_object(), "Аргументы должны быть объектом")?;
         let bytes = serde_json::to_vec(&canonical(serde_json::to_value(self)?))?;
         require(bytes.len() <= 65536, "Операция превышает 64 КиБ")?;
@@ -199,7 +224,7 @@ impl ApprovalLedger {
         };
         db.transaction(|tx| {
             tx.put("approvals", &approval.id, 0, &approval)?;
-            tx.emit(EventInput::new("approval.requested", json!({"approvalId": approval.id, "taskId": approval.operation.task_id, "tool": approval.operation.tool})).agent(&approval.operation.agent_id))?;
+            tx.emit(EventInput::new("approval.requested", json!({"approvalId": approval.id, "taskId": approval.operation.task_id, "tool": approval.operation.tool})).agent(&approval.operation.agent_id).run(&approval.operation.run_id))?;
             Ok(approval)
         })
     }
@@ -212,6 +237,12 @@ impl ApprovalLedger {
                 stored.value.state == ApprovalState::Pending && timestamp < stored.value.expires_at,
                 "Разрешение уже решено или истекло",
             )?;
+            if allow {
+                require(
+                    stored.value.operation.fingerprint()? == stored.value.fingerprint,
+                    "Операция разрешения изменилась или не привязана к области",
+                )?;
+            }
             stored.value.state = if allow {
                 ApprovalState::Approved
             } else {
@@ -224,7 +255,8 @@ impl ApprovalLedger {
                     "approval.decided",
                     json!({"approvalId":id,"state":stored.value.state}),
                 )
-                .agent(&stored.value.operation.agent_id),
+                .agent(&stored.value.operation.agent_id)
+                .run(&stored.value.operation.run_id),
             )?;
             Ok(stored.value)
         })
@@ -245,6 +277,7 @@ impl ApprovalLedger {
             if stored.value.state != ApprovalState::Approved
                 || timestamp >= stored.value.expires_at
                 || stored.value.fingerprint != fingerprint
+                || stored.value.operation.fingerprint()? != fingerprint
             {
                 return Err(Error::Denied(
                     "Нет действующего разрешения для этой операции".into(),
@@ -257,7 +290,8 @@ impl ApprovalLedger {
                     "approval.execution_started",
                     json!({"approvalId":id,"fingerprint":fingerprint}),
                 )
-                .agent(&operation.agent_id),
+                .agent(&operation.agent_id)
+                .run(&operation.run_id),
             )?;
             Ok(stored.value)
         })
@@ -285,7 +319,8 @@ impl ApprovalLedger {
                     "approval.execution_finished",
                     json!({"approvalId":id,"state":state}),
                 )
-                .agent(&stored.value.operation.agent_id),
+                .agent(&stored.value.operation.agent_id)
+                .run(&stored.value.operation.run_id),
             )?;
             Ok(stored.value)
         })

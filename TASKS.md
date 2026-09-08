@@ -26,6 +26,7 @@
   - [x] D10i. Durable gateway wait directive с проверкой срока/адресата/бюджета; runtime park после reap далее.
   - [x] D10j. Runtime park/wake и task-scoped resume; UI и actual Codex wait smoke далее.
   - [x] D10k. UI ожидания и actual Codex message wake/resume C=1; deadline smoke отдельно.
+  - [x] D10l. Exact operation дополнительно включает run, namespace и resource scope hash; старые unscoped записи читаются, но не дают разрешения. Approval gateway/ожидание/UI далее.
 - [x] D11. Источники, утверждения, связи и происхождение знаний; UI/gateway следуют отдельно.
 - [ ] D12. Артефакты с hash, экспорт, backup и восстановление.
   - [x] D12a. Content-addressed артефакты, provenance и безопасный импорт.

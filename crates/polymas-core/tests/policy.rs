@@ -6,12 +6,60 @@ fn operation() -> Operation {
     Operation {
         agent_id: "agent-a".into(),
         task_id: "task-a".into(),
+        run_id: "run-a".into(),
+        namespace: "reports/team".into(),
+        resource_scope_hash: "a".repeat(64),
         epoch: 7,
         connection_id: "db".into(),
         connection_revision: 2,
         tool: "write".into(),
         arguments: json!({"path":"report.txt","text":"approved text"}),
     }
+}
+#[test]
+fn approval_binds_run_namespace_and_resource_scope_and_legacy_unscoped_records_fail_closed() {
+    let mut db = Store::memory().unwrap();
+    let approval = ApprovalLedger::request(&mut db, operation(), 100, 300).unwrap();
+    ApprovalLedger::decide(&mut db, &approval.id, true, 101).unwrap();
+    let mut other_run = operation();
+    other_run.run_id = "run-b".into();
+    let mut other_namespace = operation();
+    other_namespace.namespace = "reports/private".into();
+    let mut other_scope = operation();
+    other_scope.resource_scope_hash = "b".repeat(64);
+    for changed in [other_run, other_namespace, other_scope] {
+        assert!(ApprovalLedger::consume(&mut db, &approval.id, &changed, 102).is_err());
+    }
+    let mut legacy = serde_json::to_value(&approval).unwrap();
+    legacy["id"] = json!("legacy");
+    legacy["state"] = json!("pending");
+    let op = legacy["operation"].as_object_mut().unwrap();
+    for key in ["runId", "namespace", "resourceScopeHash"] {
+        op.remove(key);
+    }
+    db.transaction(|tx| {
+        tx.put("approvals", "legacy", 0, &legacy)?;
+        Ok(())
+    })
+    .unwrap();
+    assert!(
+        db.get::<polymas_core::policy::Approval>("approvals", "legacy")
+            .unwrap()
+            .is_some()
+    );
+    assert!(ApprovalLedger::decide(&mut db, "legacy", true, 102).is_err());
+    assert!(ApprovalLedger::consume(&mut db, "legacy", &operation(), 102).is_err());
+    for value in ["", "with newline\n", "scope with spaces"] {
+        let mut invalid = operation();
+        invalid.namespace = value.into();
+        assert!(invalid.fingerprint().is_err());
+    }
+    let mut invalid = operation();
+    invalid.resource_scope_hash = "not-a-digest".into();
+    assert!(invalid.fingerprint().is_err());
+    ApprovalLedger::consume(&mut db, &approval.id, &operation(), 102).unwrap();
+    let events = db.events(0, 50, Some("run-a")).unwrap();
+    assert_eq!(events.len(), 3);
 }
 #[test]
 fn approval_is_exact_single_use_and_survives_reopen() {

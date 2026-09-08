@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D10l: RED Operation не содержал run/namespace/resource scope hash. GREEN четыре policy tests: смена каждой области отклонена, старый unscoped Approval десериализуется, но approval/consume не проходит, неверный namespace/hash отклонён; lifecycle events относятся к run. Прежние exact args/epoch/expiry/single-use и два binding tests сохранены; core clippy пройден. Это ledger contract, внешние записи через gateway ещё закрыты.
+
 D16d: RED отсутствующий measured label renderer; дополнительный RED показал разрыв emoji при обрезании UTF-16. GREEN два regression: пересечение текста между разными grid cells исключено, независимая подпись остаётся, reset кадра снимает занятость, ширина ≤220 px и grapheme целы. Typecheck/lint пройдены. CU после полного reload (lazy renderer сохранялся при HMR) подтвердил отсутствие прежнего перекрытия подписей 03/05 и 01/04; имена/узлы не удалены из проекции. Это проверка 13 узлов, не performance gate для тысяч.
 
 D16c: RED фактическая раскладка 6/4/2/1 + memory давала расстояние 145 при необходимом >252. GREEN padded bounds всех групп раздельны, memory в центре, изменение состава освобождает auto positions и сохраняет pin; прежние regroup/5000 definitions tests сохранены. CU 1600×1000 подтвердил отдельные холоны и память в настоящем UI. Длинные подписи нескольких соседних узлов всё ещё пересекаются — следующий отдельный fix. Полная Rust suite/clippy ранее пройдена на dc5be32; UI suite 38 tests пройдена для текущего среза.
