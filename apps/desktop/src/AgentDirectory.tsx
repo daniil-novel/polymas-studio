@@ -5,6 +5,7 @@ import type { GraphNode } from './graph/model';
 import './instances.css';
 import { AgentNameEditor, type RefreshWorkspace } from './AgentNameEditor';
 import type { Command } from './RoleEditor';
+import { AgentArchiveDialog } from './AgentArchiveDialog';
 
 interface Row {
   agent: Agent;
@@ -38,6 +39,9 @@ export function AgentDirectory({
   const [order, setOrder] = useState('name-asc');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [selection, setSelection] = useState<Set<string>>(() => new Set());
+  const [archiving, setArchiving] = useState<string[] | null>(null);
+  const [archived, setArchived] = useState(false);
   const rows = useMemo(() => {
     const config = snapshot.config.value;
     const states = new Map(nodes.map((node) => [node.id, node.state]));
@@ -132,9 +136,52 @@ export function AgentDirectory({
           </select>
         </label>
       </div>
+      <div className="instance-bulk-actions">
+        <span>
+          Выбрано: {selection.size} · вне фильтра:{' '}
+          {selection.size - rows.filter((row) => selection.has(row.agent.id)).length}
+        </span>
+        <button
+          disabled={rows.every((row) => row.state === 'archived')}
+          onClick={() => {
+            setSelection(
+              (old) =>
+                new Set([
+                  ...old,
+                  ...rows.filter((row) => row.state !== 'archived').map((row) => row.agent.id),
+                ]),
+            );
+            setArchived(false);
+          }}
+        >
+          Выбрать все найденные
+        </button>
+        <button disabled={selection.size === 0} onClick={() => setSelection(new Set())}>
+          Снять выбор
+        </button>
+        <button
+          disabled={!refresh || !connected || selection.size === 0 || selection.size > 5000}
+          onClick={() => {
+            setArchived(false);
+            setArchiving([...selection].sort());
+          }}
+        >
+          Архивировать выбранные
+        </button>
+      </div>
       <InstanceRows
         key={JSON.stringify([roleId, query, state, order])}
         rows={rows}
+        selection={selection}
+        onToggle={(id) => {
+          setArchived(false);
+          setSelection((old) => {
+            const next = new Set(old);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          });
+        }}
         onRename={
           refresh
             ? (id) => {
@@ -164,11 +211,41 @@ export function AgentDirectory({
           }}
         />
       )}
+      {archived && (
+        <p role="status" className="form-success">
+          Выбранные экземпляры архивированы
+        </p>
+      )}
+      {archiving && refresh && (
+        <AgentArchiveDialog
+          ids={archiving}
+          snapshot={snapshot}
+          connected={connected}
+          refresh={refresh}
+          command={command}
+          onClose={() => setArchiving(null)}
+          onSaved={() => {
+            setSelection(new Set());
+            setArchiving(null);
+            setArchived(true);
+          }}
+        />
+      )}
     </section>
   );
 }
 
-function InstanceRows({ rows, onRename }: { rows: Row[]; onRename?: (id: string) => void }) {
+function InstanceRows({
+  rows,
+  onRename,
+  selection,
+  onToggle,
+}: {
+  rows: Row[];
+  onRename?: (id: string) => void;
+  selection: Set<string>;
+  onToggle: (id: string) => void;
+}) {
   const viewport = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(540);
@@ -226,13 +303,14 @@ function InstanceRows({ rows, onRename }: { rows: Row[]; onRename?: (id: string)
           aria-rowcount={rows.length + 1}
         >
           <colgroup>
-            {[230, 220, 205, 180, 185, 200, 170, 55].map((width, i) => (
+            {[45, 230, 220, 205, 180, 185, 200, 170, 55].map((width, i) => (
               <col key={i} style={{ width }} />
             ))}
           </colgroup>
           <thead>
             <tr aria-rowindex={1}>
               {[
+                'Выбор',
                 'Экземпляр',
                 'ID',
                 'Версия роли',
@@ -251,11 +329,20 @@ function InstanceRows({ rows, onRename }: { rows: Row[]; onRename?: (id: string)
           <tbody>
             {start > 0 && (
               <tr aria-hidden="true" className="instance-spacer">
-                <td colSpan={8} style={{ height: start * rowHeight }} />
+                <td colSpan={9} style={{ height: start * rowHeight }} />
               </tr>
             )}
             {rows.slice(start, end).map((row, index) => (
               <tr key={row.agent.id} aria-rowindex={start + index + 2}>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Выбрать ${row.agent.name}`}
+                    checked={selection.has(row.agent.id)}
+                    disabled={row.state === 'archived' && !selection.has(row.agent.id)}
+                    onChange={() => onToggle(row.agent.id)}
+                  />
+                </td>
                 <td title={row.agent.name}>
                   <span className="instance-name">
                     <i className={`dot ${row.state}`} />
@@ -298,7 +385,7 @@ function InstanceRows({ rows, onRename }: { rows: Row[]; onRename?: (id: string)
             ))}
             {end < rows.length && (
               <tr aria-hidden="true" className="instance-spacer">
-                <td colSpan={8} style={{ height: (rows.length - end) * rowHeight }} />
+                <td colSpan={9} style={{ height: (rows.length - end) * rowHeight }} />
               </tr>
             )}
           </tbody>
