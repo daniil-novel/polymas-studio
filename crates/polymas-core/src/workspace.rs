@@ -39,6 +39,11 @@ pub enum ConfigCommand {
         expected_version: u32,
         draft: RoleDraft,
     },
+    RestoreRole {
+        role_id: String,
+        source_version: u32,
+        expected_version: u32,
+    },
     CreateAgents {
         key: String,
         request: BatchRequest,
@@ -75,6 +80,7 @@ impl ConfigCommand {
             Self::RenameWorkspace { .. } => "workspace.renamed",
             Self::CreateRole { .. } => "role.created",
             Self::ReviseRole { .. } => "role.revised",
+            Self::RestoreRole { .. } => "role.restored",
             Self::CreateAgents { .. } => "agents.created",
             Self::PinRole { .. } => "agents.role_pinned",
             Self::RenameAgent { .. } => "agent.renamed",
@@ -275,6 +281,17 @@ impl Workspace {
                 expected_version,
                 draft,
             )?)?,
+            ConfigCommand::RestoreRole {
+                role_id,
+                source_version,
+                expected_version,
+            } => {
+                let role =
+                    candidate
+                        .registry
+                        .restore_role(&role_id, source_version, expected_version)?;
+                json!({"role":role,"sourceVersion":source_version})
+            }
             ConfigCommand::CreateAgents { key, request } => {
                 json!({"ids":candidate.registry.create_batch(&key,request)?})
             }

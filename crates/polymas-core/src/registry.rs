@@ -190,12 +190,27 @@ impl Registry {
         }
         let version = RoleVersion {
             id: role_id.into(),
-            version: latest + 1,
+            version: latest
+                .checked_add(1)
+                .ok_or_else(|| Error::Validation("Исчерпан диапазон номеров версий роли".into()))?,
             created_at: now(),
             draft,
         };
         self.roles.push(version.clone());
         Ok(version)
+    }
+    pub fn restore_role(
+        &mut self,
+        role_id: &str,
+        source_version: u32,
+        expected_version: u32,
+    ) -> Result<RoleVersion> {
+        require(
+            source_version < expected_version,
+            "Для восстановления выберите более раннюю версию роли",
+        )?;
+        let source = self.role(role_id, source_version)?.draft.clone();
+        self.revise_role(role_id, expected_version, source)
     }
     pub fn create_batch(&mut self, key: &str, request: BatchRequest) -> Result<Vec<String>> {
         require(
