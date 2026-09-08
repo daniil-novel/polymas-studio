@@ -9,6 +9,7 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
+mod wiki;
 
 #[derive(Clone, Debug)]
 pub struct ExchangeScope {
@@ -40,11 +41,14 @@ pub struct Publication {
     pub body: String,
     pub slug: Option<String>,
     pub revision: u32,
+    #[serde(default)]
+    pub previous_id: Option<String>,
     pub created_at: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct PublicationQuery {
+    pub latest_only: bool,
     pub after: i64,
     pub limit: usize,
     pub entry_id: Option<String>,
@@ -53,6 +57,7 @@ pub struct PublicationQuery {
 impl Default for PublicationQuery {
     fn default() -> Self {
         Self {
+            latest_only: false,
             after: 0,
             limit: 20,
             entry_id: None,
@@ -95,7 +100,10 @@ impl Publications {
         input: PublicationInput,
     ) -> Result<Publication> {
         require(
-            scope.mode == CommunicationMode::Blackboard,
+            matches!(
+                scope.mode,
+                CommunicationMode::Blackboard | CommunicationMode::Wiki
+            ),
             "Режим публикаций пока недоступен",
         )?;
         bounded(&scope.run_id, 200, "Запуск")?;
@@ -111,10 +119,14 @@ impl Publications {
         bounded(&input.key, 128, "Ключ")?;
         bounded(&input.title, 200, "Заголовок")?;
         bounded(&input.body, 16384, "Markdown")?;
-        require(
-            input.slug.is_none() && input.expected_revision == 0,
-            "Запись доски неизменяема и не имеет slug",
-        )?;
+        if scope.mode == CommunicationMode::Wiki {
+            wiki::validate(&input)?;
+        } else {
+            require(
+                input.slug.is_none() && input.expected_revision == 0,
+                "Запись доски неизменяема и не имеет slug",
+            )?;
+        }
         let receipt_key = hash(&serde_json::to_vec(&(
             &scope.run_id,
             &scope.author,
@@ -130,7 +142,8 @@ impl Publications {
             }
             let count: i64 = tx.connection().query_row("SELECT (SELECT COUNT(*) FROM entities WHERE collection='publications' AND json_extract(document,'$.runId')=?1) + (SELECT COUNT(*) FROM messages WHERE run_id=?1)", [&scope.run_id], |r| r.get(0))?;
             require(count < scope.max_publications as i64, "Исчерпан общий бюджет сообщений и публикаций")?;
-            let entry = Publication { id: id("publication"), run_id: scope.run_id.clone(), mode: scope.mode, author: scope.author.clone(), contributors: vec![scope.author.clone()], title: input.title, body: input.body, slug: None, revision: 1, created_at: now() };
+            let mut entry = Publication { id: id("publication"), run_id: scope.run_id.clone(), mode: scope.mode, author: scope.author.clone(), contributors: vec![scope.author.clone()], title: input.title.clone(), body: input.body.clone(), slug: input.slug.clone(), revision: 1, previous_id: None, created_at: now() };
+            if scope.mode == CommunicationMode::Wiki { wiki::revise(tx, scope, &input, &mut entry)?; }
             tx.put("publications", &entry.id, 0, &entry)?;
             tx.put("publication_receipts", &receipt_key, 0, &Receipt { fingerprint, entry_id: entry.id.clone() })?;
             tx.emit(EventInput::new("communication.published", json!({"entryId":entry.id,"mode":entry.mode,"revision":entry.revision,"bytes":entry.body.len()})).agent(&scope.author).run(&scope.run_id))?;
@@ -159,7 +172,7 @@ impl Publications {
         {
             bounded(filter, 200, "Фильтр")?;
         }
-        let mut stmt = db.connection().prepare("SELECT rowid,document FROM entities e WHERE collection='publications' AND json_extract(document,'$.runId')=?1 AND rowid>?2 AND (?3 IS NULL OR id=?3) AND (?4 IS NULL OR json_extract(document,'$.slug')=?4) AND (?5 OR NOT EXISTS (SELECT 1 FROM json_each(e.document,'$.contributors') c WHERE c.value NOT IN (SELECT value FROM json_each(?6)))) ORDER BY rowid LIMIT ?7")?;
+        let mut stmt = db.connection().prepare("SELECT rowid,document FROM entities e WHERE collection='publications' AND json_extract(document,'$.runId')=?1 AND rowid>?2 AND (?3 IS NULL OR id=?3) AND (?4 IS NULL OR json_extract(document,'$.slug')=?4) AND (?5 OR NOT EXISTS (SELECT 1 FROM json_each(e.document,'$.contributors') c WHERE c.value NOT IN (SELECT value FROM json_each(?6)))) AND (NOT ?8 OR json_extract(e.document,'$.mode')!='wiki' OR e.id IN (SELECT json_extract(h.document,'$.entryId') FROM entities h WHERE h.collection='publication_heads' AND json_extract(h.document,'$.runId')=?1)) ORDER BY rowid LIMIT ?7")?;
         let rows = stmt.query_map(
             params![
                 run_id,
@@ -168,7 +181,8 @@ impl Publications {
                 query.slug,
                 authors.is_none(),
                 serde_json::to_string(&authors.unwrap_or_default())?,
-                (query.limit + 1) as i64
+                (query.limit + 1) as i64,
+                query.latest_only
             ],
             |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)),
         )?;

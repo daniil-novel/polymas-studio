@@ -23,6 +23,108 @@ fn input(key: &str) -> PublicationInput {
     }
 }
 
+fn wiki(author: &str) -> ExchangeScope {
+    ExchangeScope {
+        mode: CommunicationMode::Wiki,
+        ..scope(author)
+    }
+}
+fn page_input(key: &str, expected_revision: u32) -> PublicationInput {
+    PublicationInput {
+        slug: Some("shared-plan".into()),
+        expected_revision,
+        ..input(key)
+    }
+}
+
+#[test]
+fn wiki_concurrent_writers_cannot_lose_a_revision_or_consume_the_losing_receipt() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("wiki.db");
+    let mut db = Store::open(&path).unwrap();
+    let original = Publications::publish(&mut db, &wiki("a"), page_input("create", 0)).unwrap();
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let handles: Vec<_> = ["a", "b"]
+        .into_iter()
+        .map(|author| {
+            let path = path.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                let mut other = Store::open(&path).unwrap();
+                barrier.wait();
+                Publications::publish(&mut other, &wiki(author), page_input("update", 1))
+            })
+        })
+        .collect();
+    let results: Vec<_> = handles
+        .into_iter()
+        .map(|handle| handle.join().unwrap())
+        .collect();
+    assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+    let winner = results.iter().find_map(|r| r.as_ref().ok()).unwrap();
+    assert_eq!(winner.revision, 2);
+    let loser = if winner.author == "a" { "b" } else { "a" };
+    let third = Publications::publish(&mut db, &wiki(loser), page_input("update", 2)).unwrap();
+    assert_eq!(third.revision, 3);
+    assert_eq!(third.contributors, vec!["a", "b"]);
+    let all = Publications::page(&db, "run-one", &PublicationQuery::default(), None).unwrap();
+    assert_eq!(all.items.len(), 3);
+    assert_eq!(all.items[0].id, original.id);
+    let latest = Publications::page(
+        &db,
+        "run-one",
+        &PublicationQuery {
+            latest_only: true,
+            slug: Some("shared-plan".into()),
+            ..Default::default()
+        },
+        None,
+    )
+    .unwrap();
+    assert_eq!(latest.items[0].id, third.id);
+    assert_eq!(latest.items.len(), 1);
+    let mut revoked = wiki(loser);
+    revoked.readable_authors = vec![loser.into()];
+    assert!(Publications::publish(&mut db, &revoked, page_input("update", 2)).is_err());
+    assert!(
+        Publications::page(
+            &db,
+            "run-one",
+            &PublicationQuery {
+                latest_only: true,
+                ..Default::default()
+            },
+            Some(&["b".into()])
+        )
+        .unwrap()
+        .items
+        .is_empty()
+    );
+}
+
+#[test]
+fn wiki_is_run_scoped_and_rejects_filesystem_paths_and_unknown_revisions() {
+    let mut db = Store::memory().unwrap();
+    for bad in [
+        page_input("missing", 1),
+        PublicationInput {
+            slug: Some("../escape".into()),
+            ..page_input("path", 0)
+        },
+    ] {
+        assert!(Publications::publish(&mut db, &wiki("a"), bad).is_err());
+    }
+    let a = Publications::publish(&mut db, &wiki("a"), page_input("new", 0)).unwrap();
+    let other = ExchangeScope {
+        run_id: "run-two".into(),
+        ..wiki("a")
+    };
+    let b = Publications::publish(&mut db, &other, page_input("new", 0)).unwrap();
+    assert_ne!(a.id, b.id);
+    assert_eq!(a.revision, b.revision);
+    assert!(Publications::publish(&mut db, &wiki("b"), page_input("overwrite", 0)).is_err());
+}
+
 #[test]
 fn board_is_durable_append_only_and_exact_retries_do_not_spend_budget() {
     let dir = tempfile::tempdir().unwrap();
