@@ -121,6 +121,7 @@
 - [ ] D24. Упаковка Windows, SBOM, release workflow и инструкции.
   - [x] D24a. Переносимая нормализация CycloneDX 1.5 и сводка лицензий с регрессионными проверками в CI; настоящая NSIS-сборка 9aa7b56 и четыре schema-valid SBOM. [Доказательства и команды](specs/evidence/windows-packaging-9aa7b56.md). Release workflow, notices, подпись и installer lifecycle далее.
 - [ ] D25. Финальный self-review, README, changelog и матрица приёмки.
+  - [x] D25b. Ограничены параллельные JSDOM workers (2) для полного набора больших frontend fixtures; 91 test/TS/lint/build прошли до коммита, таймауты/assertions/retry не меняются. Проверка после коммита обязательна как для остальных срезов.
   - [x] D25a. README текущего исполняемого среза: сборка, сценарии, данные, проверки, диагностика и явные незакрытые требования; финальный release review далее.
 
 ## Внешние условия для выпуска

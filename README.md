@@ -115,6 +115,8 @@ npm ci
 
 Проверка включает Rust tests/clippy/format, TypeScript, ESLint, Vitest, production UI build и контрактные примеры. На Linux: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `npm test`, `npm run build`; staging GUI не нужен. Windows CI собирает sidecar перед тестами оболочки. Нативные IPC-тесты используют MockRuntime и настоящие capabilities; тесты launcher запускают реальные OS-процессы.
 
+Frontend tests запускают не более двух JSDOM workers одновременно: крупные сценарии не должны конкурировать за ресурсы всей машины. Таймаут одного теста остаётся стандартным; ошибки и зависания не маскируются повтором. Это ограничение тестового набора, отдельно от параллелизма агентов в приложении.
+
 Проверки с внешними ресурсами запускаются отдельно:
 
 ```powershell

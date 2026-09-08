@@ -6,5 +6,11 @@ export default defineConfig({
   root: 'apps/desktop',
   build: { outDir: '../../dist', emptyOutDir: true, target: 'es2022' },
   server: { port: 1420, strictPort: true, proxy: { '/api': 'http://127.0.0.1:8787' } },
-  test: { root: '.', include: ['tests/frontend/**/*.test.{ts,tsx}'], environment: 'jsdom' },
+  test: {
+    root: '.',
+    include: ['tests/frontend/**/*.test.{ts,tsx}'],
+    environment: 'jsdom',
+    // Bound concurrent DOM environments on workstations running the desktop app as well.
+    maxWorkers: 2,
+  },
 });
