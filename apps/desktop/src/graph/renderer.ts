@@ -1,6 +1,6 @@
 import { DirectedGraph } from 'graphology';
 import Sigma from 'sigma';
-import { IMPULSE_MS, type GraphProjection, type Positions } from './model';
+import { IMPULSE_MS, stablePositions, type GraphProjection, type Positions } from './model';
 
 const colors: Record<string, string> = {
   running: '#6DE0B3',
@@ -71,6 +71,7 @@ export class GraphRenderer {
     visible: Set<string>,
     groupLabels: Record<string, string>,
   ) {
+    const previous = this.projection;
     this.projection = projection;
     this.selected = selected;
     this.visible = visible;
@@ -81,7 +82,7 @@ export class GraphRenderer {
       this.worker.postMessage({
         version: ++this.version,
         nodes: projection.nodes,
-        pinned: { ...this.positions, ...pinned },
+        pinned: stablePositions(previous.nodes, projection.nodes, this.positions, pinned),
       });
     } else this.apply();
   }

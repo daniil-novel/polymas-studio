@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { projectGraph, layoutGraph } from '../../apps/desktop/src/graph/model';
+import { projectGraph, layoutGraph, stablePositions } from '../../apps/desktop/src/graph/model';
 import type { Agent, Architecture, RuntimeEvent, TaskSummary } from '../../apps/desktop/src/types';
 
 const agents = (n: number): Agent[] =>
@@ -31,6 +31,21 @@ const arch = (patch: Partial<Architecture> = {}): Architecture => ({
   ...patch,
 });
 const now = Date.parse('2026-09-08T10:00:00Z');
+test('regrouping releases automatic positions but preserves manually pinned coordinates', () => {
+  const before = [
+    { id: 'a0', group: 'old' },
+    { id: 'a1', group: 'keep' },
+    { id: 'a2', group: 'old' },
+  ];
+  const next = [
+    { id: 'a0', group: 'new' },
+    { id: 'a1', group: 'keep' },
+    { id: 'a2', group: 'new' },
+  ];
+  expect(
+    stablePositions(before, next, { a0: [1, 2], a1: [3, 4], a2: [5, 6] }, { a2: [7, 8] }),
+  ).toEqual({ a1: [3, 4], a2: [7, 8] });
+});
 test('graph permissions match runtime for independent and optional coordinator modes', () => {
   const withEdge = arch({
     preset: 'independent',

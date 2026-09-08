@@ -26,6 +26,21 @@ export interface GraphProjection {
   impulses: Impulse[];
 }
 export type Positions = Record<string, [number, number]>;
+export function stablePositions(
+  before: Pick<GraphNode, 'id' | 'group'>[],
+  next: Pick<GraphNode, 'id' | 'group'>[],
+  automatic: Positions,
+  pinned: Positions,
+): Positions {
+  const previous = new Map(before.map((n) => [n.id, n.group]));
+  const result: Positions = {};
+  for (const node of next) {
+    if (pinned[node.id]) result[node.id] = pinned[node.id];
+    else if (previous.get(node.id) === node.group && automatic[node.id])
+      result[node.id] = automatic[node.id];
+  }
+  return result;
+}
 
 // This projection is shared by the canvas and the accessible list. A static
 // topology edge never implies an actual delivery or an active process.
