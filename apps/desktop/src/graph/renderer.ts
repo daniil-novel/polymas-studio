@@ -247,7 +247,7 @@ export class GraphRenderer {
       ctx.setLineDash([3, 5]);
     }
     ctx.setLineDash([]);
-    const now = Date.now();
+    const now = this.projection.frameTime ?? Date.now();
     for (const node of this.projection.nodes) {
       const p = points.get(node.id);
       if (!p) continue;
@@ -345,6 +345,7 @@ export class GraphRenderer {
     if (this.disposed) return;
     if (
       !document.hidden &&
+      this.projection.frameTime === undefined &&
       !this.reduced.matches &&
       (this.projection.nodes.some((n) => n.active) ||
         this.projection.impulses.some((e) => Date.now() - e.time < IMPULSE_MS))

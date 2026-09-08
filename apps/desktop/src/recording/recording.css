@@ -1,0 +1,213 @@
+.recording-shell {
+  height: 100vh;
+  background: var(--canvas);
+  overflow: auto;
+}
+.recording-workspace {
+  min-height: 700px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.recording-header {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.recording-header > button:last-child {
+  margin-left: auto;
+}
+.recording-badge {
+  color: var(--violet);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.recording-title {
+  padding: 22px 28px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.recording-title h1 {
+  font-size: 22px;
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}
+.recording-title > span {
+  flex-shrink: 0;
+}
+.recording-body {
+  flex: 1;
+  min-height: 390px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  margin: 0 24px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.recording-canvas {
+  position: relative;
+  min-height: 390px;
+  background: radial-gradient(ellipse at center, #182220 0%, var(--canvas) 70%);
+}
+.recording-canvas .graph-workbench {
+  inset: 16px 0 35px;
+}
+.recording-legend {
+  position: absolute;
+  bottom: 4px;
+  left: 20px;
+  right: 16px;
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+.recording-inspector {
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  padding: 20px;
+  overflow: auto;
+  min-height: 0;
+}
+.recording-inspector h2 {
+  font-size: 18px;
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.recording-inspector label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.recording-inspector select {
+  width: 100%;
+}
+.recording-search {
+  position: relative;
+}
+.recording-search svg {
+  position: absolute;
+  left: 10px;
+  top: 11px;
+  color: var(--muted);
+}
+.recording-search input {
+  padding-left: 32px;
+  width: 100%;
+}
+.recording-event-list {
+  height: 252px;
+  overflow: auto;
+  margin: 8px 0 12px;
+}
+.recording-event-list button {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: stretch;
+  text-align: left;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  padding: 4px 8px;
+}
+.recording-event-list button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.recording-event-list button small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.recording-event-list button.selected {
+  background: #29243d;
+  color: var(--violet);
+}
+.recording-detail {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+.recording-detail pre {
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  padding: 12px;
+  background: var(--canvas);
+  border-radius: 5px;
+}
+.recording-transport {
+  padding: 16px 28px 18px;
+}
+.recording-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.recording-buttons button {
+  font-size: 12px;
+}
+.recording-buttons select {
+  width: 76px;
+  flex: 0 0 76px;
+}
+.recording-buttons time {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: auto;
+}
+.recording-transport input[type='range'] {
+  width: 100%;
+  accent-color: var(--violet);
+  padding: 0;
+  margin-top: 14px;
+}
+.recording-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+}
+.recording-empty {
+  padding: 50px;
+  text-align: center;
+}
+@media (max-width: 1100px) {
+  .recording-body {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+  .recording-header {
+    flex-wrap: wrap;
+  }
+  .recording-title {
+    align-items: start;
+  }
+}
+@media (max-width: 760px) {
+  .recording-body {
+    display: block;
+    overflow: auto;
+  }
+  .recording-title {
+    flex-direction: column;
+  }
+  .recording-inspector {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}

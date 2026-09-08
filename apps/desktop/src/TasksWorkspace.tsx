@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Plus, Square } from 'lucide-react';
+import { Box, Plus, Square, History } from 'lucide-react';
 import type { ApiClient } from './api';
 import type { Command } from './RoleEditor';
 import { TaskComposer } from './TaskComposer';
@@ -12,16 +12,20 @@ export function TasksWorkspace({
   client,
   command,
   onContinue,
+  onReplay,
+  initialRunId,
 }: {
   snapshot: Snapshot;
   events: RuntimeEvent[];
   client: ApiClient;
   command: Command;
   onContinue: (id: string) => void;
+  onReplay: (id: string) => void;
+  initialRunId?: string | null;
 }) {
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(initialRunId ?? null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [composing, setComposing] = useState(true);
+  const [composing, setComposing] = useState(!initialRunId);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const selectedRun = snapshot.runs.find((r) => r.id === selectedRunId);
@@ -99,6 +103,10 @@ export function TasksWorkspace({
               <h2>{selectedRun.title}</h2>
               <p className="small muted">Снимок архитектуры: v{selectedRun.configRevision}</p>
               <div className="task-actions">
+                <button onClick={() => onReplay(selectedRun.id)}>
+                  <History size={14} />
+                  Посмотреть запись
+                </button>
                 <button
                   disabled={busy || selectedRun.stopped || selectedRun.accepted}
                   onClick={() => void act('cancel')}

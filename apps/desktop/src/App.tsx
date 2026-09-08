@@ -34,6 +34,7 @@ import { TaskComposer } from './TaskComposer';
 import { TasksWorkspace } from './TasksWorkspace';
 import { McpWorkspace } from './McpWorkspace';
 import { KnowledgeWorkspace } from './knowledge/KnowledgeWorkspace';
+import { RecordingWorkspace } from './recording/RecordingWorkspace';
 import { agentState, stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
@@ -51,6 +52,8 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   const [token, setToken] = useState('');
   const [architectureOpen, setArchitectureOpen] = useState(false);
   const [chatAgentId, setChatAgentId] = useState<string | null>(null);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  const [returnRunId, setReturnRunId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -84,6 +87,17 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
     { id: 'events' as const, label: 'События', Icon: Activity },
     { id: 'settings' as const, label: 'Настройки', Icon: Settings2 },
   ];
+  if (recordingId)
+    return (
+      <div className="recording-shell">
+        <DesktopLifecycle />
+        <RecordingWorkspace
+          client={client}
+          runId={recordingId}
+          onExit={() => setRecordingId(null)}
+        />
+      </div>
+    );
   return (
     <div className="app-shell">
       <DesktopLifecycle />
@@ -324,6 +338,11 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                     client={client}
                     command={data.command}
                     onContinue={setChatAgentId}
+                    initialRunId={returnRunId}
+                    onReplay={(id) => {
+                      setReturnRunId(id);
+                      setRecordingId(id);
+                    }}
                   />
                 </div>
                 {page === 'events' && (

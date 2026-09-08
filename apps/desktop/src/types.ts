@@ -188,6 +188,8 @@ export interface RuntimeEvent {
   body: Record<string, unknown>;
 }
 export const stateLabels: Record<string, string> = {
+  unobserved: 'Ещё нет события',
+  not_participating: 'Не участник запуска',
   idle: 'Готов',
   queued: 'В очереди',
   running: 'Выполняет задачу',

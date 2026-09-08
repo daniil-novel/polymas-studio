@@ -21,6 +21,8 @@ export interface Impulse extends GraphEdge {
   kind: 'message' | 'memory';
 }
 export interface GraphProjection {
+  /** Fixed historical clock for replay; absent for live observations. */
+  frameTime?: number;
   nodes: GraphNode[];
   edges: GraphEdge[];
   impulses: Impulse[];
