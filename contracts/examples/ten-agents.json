@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "demo-ten",
+  "name": "Команда из 10 отдельных Codex",
+  "runtime": {
+    "adapter": "codex-exec",
+    "authProfileRef": "auth://local-user",
+    "modelSelection": "runtime-default"
+  },
+  "roles": [
+    {
+      "id": "researcher",
+      "version": 1,
+      "name": "Исследователь",
+      "instruction": "Проверь материалы задачи. Приведи источники и обозначь неопределённость. Действуй только в разрешённых пределах.",
+      "outputContract": "markdown_with_sources"
+    },
+    {
+      "id": "coordinator",
+      "version": 1,
+      "name": "Координатор",
+      "instruction": "Распредели задачу между участниками по их ролям. Проверь результаты и собери итог. Не расширяй права и лимиты.",
+      "outputContract": "task_plan_and_summary"
+    },
+    {
+      "id": "critic",
+      "version": 1,
+      "name": "Критик",
+      "instruction": "Проверь утверждения, ссылки и соблюдение критериев. Укажи конкретные замечания.",
+      "outputContract": "review_with_evidence"
+    }
+  ],
+  "populations": [
+    {
+      "id": "coord",
+      "roleId": "coordinator",
+      "roleVersion": 1,
+      "count": 1,
+      "namePattern": "Координатор · {n:02}"
+    },
+    {
+      "id": "research",
+      "roleId": "researcher",
+      "roleVersion": 1,
+      "count": 6,
+      "namePattern": "Исследователь · {n:02}"
+    },
+    {
+      "id": "critics",
+      "roleId": "critic",
+      "roleVersion": 1,
+      "count": 3,
+      "namePattern": "Критик · {n:02}"
+    }
+  ],
+  "holons": [
+    {
+      "id": "team",
+      "name": "Команда",
+      "parentId": null,
+      "populationIds": [
+        "coord",
+        "research",
+        "critics"
+      ]
+    }
+  ],
+  "topology": {
+    "preset": "star",
+    "coordinatorPopulationId": "coord",
+    "sharedMemoryConnectionId": null,
+    "edges": [
+      {
+        "from": "population:coord",
+        "to": "population:research",
+        "messageTypes": [
+          "task_request",
+          "question"
+        ]
+      },
+      {
+        "from": "population:research",
+        "to": "population:coord",
+        "messageTypes": [
+          "result",
+          "evidence",
+          "escalation"
+        ]
+      },
+      {
+        "from": "population:coord",
+        "to": "population:critics",
+        "messageTypes": [
+          "task_request"
+        ]
+      },
+      {
+        "from": "population:critics",
+        "to": "population:coord",
+        "messageTypes": [
+          "critique",
+          "result"
+        ]
+      }
+    ]
+  },
+  "execution": {
+    "maxConcurrency": 10,
+    "admission": "queue_allowed",
+    "maxTurnsPerTask": 20,
+    "maxMessagesPerRun": 1000,
+    "messageHopLimit": 8,
+    "deadlineSeconds": 3600
+  },
+  "connections": [],
+  "bindings": []
+}
+

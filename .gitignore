@@ -1,0 +1,7 @@
+node_modules/
+.polymas/
+*.local
+.env
+.env.*
+!.env.example
+tmp/

@@ -1,0 +1,455 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://polymas.local/schemas/architecture-0.1.0.json",
+  "title": "PolyMAS architecture import document 0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "0.1.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "enum": [
+            "codex-exec",
+            "codex-app-server-experimental"
+          ]
+        },
+        "authProfileRef": {
+          "type": "string",
+          "pattern": "^auth://[a-z0-9-]+$"
+        },
+        "modelSelection": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "adapter",
+        "authProfileRef",
+        "modelSelection"
+      ]
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "instruction": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outputContract": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "name",
+          "instruction",
+          "outputContract"
+        ]
+      },
+      "maxItems": 500,
+      "minItems": 1
+    },
+    "populations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "roleId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "roleVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          },
+          "namePattern": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "roleId",
+          "roleVersion",
+          "count",
+          "namePattern"
+        ]
+      },
+      "maxItems": 5000,
+      "minItems": 1
+    },
+    "holons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "populationIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "maxItems": 5000,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "parentId",
+          "populationIds"
+        ]
+      },
+      "maxItems": 500
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "enum": [
+            "single",
+            "independent",
+            "network",
+            "star",
+            "holonic",
+            "custom"
+          ]
+        },
+        "coordinatorPopulationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sharedMemoryConnectionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "messageTypes": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "task_request",
+                    "evidence",
+                    "question",
+                    "answer",
+                    "critique",
+                    "result",
+                    "escalation"
+                  ]
+                },
+                "maxItems": 7,
+                "minItems": 1,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "messageTypes"
+            ]
+          },
+          "maxItems": 25000
+        }
+      },
+      "required": [
+        "preset",
+        "coordinatorPopulationId",
+        "sharedMemoryConnectionId",
+        "edges"
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxConcurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "admission": {
+          "enum": [
+            "queue_allowed",
+            "start_all"
+          ]
+        },
+        "maxTurnsPerTask": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "maxMessagesPerRun": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "messageHopLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "deadlineSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "maxConcurrency",
+        "admission",
+        "maxTurnsPerTask",
+        "maxMessagesPerRun",
+        "messageHopLimit",
+        "deadlineSeconds"
+      ]
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "recipeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recipeVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "transport": {
+            "enum": [
+              "stdio",
+              "streamable_http"
+            ]
+          },
+          "enabledDesired": {
+            "type": "boolean"
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "secretRefs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^secret://[a-z0-9/-]+$"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "recipeId",
+          "recipeVersion",
+          "transport",
+          "enabledDesired",
+          "secretRefs"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "transport": {
+                  "const": "stdio"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "command",
+                "args"
+              ],
+              "not": {
+                "required": [
+                  "url"
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "url"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "command"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "args"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "maxItems": 100
+    },
+    "bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "connectionId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "mode": {
+            "enum": [
+              "read",
+              "write"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "namespaces": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "connectionId",
+          "mode",
+          "required",
+          "tools",
+          "namespaces"
+        ]
+      },
+      "maxItems": 10000
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "runtime",
+    "roles",
+    "populations",
+    "holons",
+    "topology",
+    "execution",
+    "connections",
+    "bindings"
+  ]
+}
+

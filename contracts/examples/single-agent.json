@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "demo-single",
+  "name": "Один агент",
+  "runtime": {
+    "adapter": "codex-exec",
+    "authProfileRef": "auth://local-user",
+    "modelSelection": "runtime-default"
+  },
+  "roles": [
+    {
+      "id": "researcher",
+      "version": 1,
+      "name": "Исследователь",
+      "instruction": "Проверь материалы задачи. Приведи источники и обозначь неопределённость. Действуй только в разрешённых пределах.",
+      "outputContract": "markdown_with_sources"
+    }
+  ],
+  "populations": [
+    {
+      "id": "research",
+      "roleId": "researcher",
+      "roleVersion": 1,
+      "count": 1,
+      "namePattern": "Исследователь · {n:02}"
+    }
+  ],
+  "holons": [],
+  "topology": {
+    "preset": "single",
+    "coordinatorPopulationId": null,
+    "sharedMemoryConnectionId": null,
+    "edges": []
+  },
+  "execution": {
+    "maxConcurrency": 1,
+    "admission": "queue_allowed",
+    "maxTurnsPerTask": 20,
+    "maxMessagesPerRun": 1000,
+    "messageHopLimit": 8,
+    "deadlineSeconds": 3600
+  },
+  "connections": [],
+  "bindings": []
+}
+
