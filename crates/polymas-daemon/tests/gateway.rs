@@ -225,7 +225,7 @@ async fn source_discovery_and_calls_apply_live_and_pinned_bindings_and_record_re
     let (status, result) = call(
         &state,
         grant.token.expose(),
-        "polymas_call_source",
+        "polymas_read_source",
         input.clone(),
     )
     .await;
@@ -237,7 +237,7 @@ async fn source_discovery_and_calls_apply_live_and_pinned_bindings_and_record_re
         call(
             &state,
             grant.token.expose(),
-            "polymas_call_source",
+            "polymas_read_source",
             wrong_namespace
         )
         .await
@@ -247,7 +247,7 @@ async fn source_discovery_and_calls_apply_live_and_pinned_bindings_and_record_re
     let mut escape = input.clone();
     escape["arguments"]["path"] = json!("../outside.txt");
     assert_eq!(
-        call(&state, grant.token.expose(), "polymas_call_source", escape)
+        call(&state, grant.token.expose(), "polymas_read_source", escape)
             .await
             .1["isError"],
         true
@@ -258,7 +258,7 @@ async fn source_discovery_and_calls_apply_live_and_pinned_bindings_and_record_re
         call(
             &state,
             grant.token.expose(),
-            "polymas_call_source",
+            "polymas_read_source",
             impersonate
         )
         .await
@@ -278,7 +278,7 @@ async fn source_discovery_and_calls_apply_live_and_pinned_bindings_and_record_re
         .unwrap();
     drop(engine);
     assert_eq!(
-        call(&state, grant.token.expose(), "polymas_call_source", input)
+        call(&state, grant.token.expose(), "polymas_read_source", input)
             .await
             .1["isError"],
         true
@@ -326,7 +326,7 @@ async fn a_real_stdio_bridge_initializes_lists_tools_and_reads_through_scoped_ht
     let input = json!({"connectionId":connection,"namespace":"shared","tool":"read_text","arguments":{"root":0,"path":"guide.txt"}});
     let result = client
         .call_tool(
-            CallToolRequestParams::new("polymas_call_source")
+            CallToolRequestParams::new("polymas_read_source")
                 .with_arguments(input.as_object().unwrap().clone()),
         )
         .await
@@ -348,4 +348,96 @@ async fn a_real_stdio_bridge_initializes_lists_tools_and_reads_through_scoped_ht
         .await
         .unwrap();
     service.abort();
+}
+
+#[tokio::test]
+async fn the_read_only_gateway_contract_cannot_execute_an_allowed_write_tool() {
+    let definitions = polymas_daemon::gateway_tools::definitions();
+    let read = definitions["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "polymas_read_source")
+        .expect("read interface is explicit and separately annotated");
+    assert_eq!(read["annotations"]["readOnlyHint"], true);
+    assert_eq!(read["annotations"]["destructiveHint"], false);
+    let (_dir, state, task_id) = setup().await;
+    let mut engine = state.engine.lock().await;
+    let epoch = engine
+        .scheduler
+        .task(&task_id)
+        .unwrap()
+        .lease
+        .as_ref()
+        .unwrap()
+        .epoch;
+    engine.finish(&task_id, epoch, Ok("done".into())).unwrap();
+    let mut stored = engine
+        .workspace
+        .db
+        .list::<polymas_core::connections::Connection>("connections", 10)
+        .unwrap()
+        .remove(0);
+    stored.value.transport = polymas_core::connections::ConnectionTransport::Stdio {
+        command: env!("CARGO_BIN_EXE_polymas-daemon").into(),
+        args: vec!["--help".into()],
+    };
+    stored.value.recipe = "custom".into();
+    stored.value.read_only = false;
+    stored
+        .value
+        .tools
+        .push(polymas_core::connections::ToolDescription {
+            name: "write_record".into(),
+            description: "Write a record".into(),
+            input_schema: json!({"type":"object"}),
+            read_only: false,
+        });
+    stored.value.tool_allowlist.push("write_record".into());
+    stored.value.validate().unwrap();
+    let connection_id = stored.value.id.clone();
+    polymas_daemon::connection_api::persist_connection(
+        &mut engine,
+        stored.revision,
+        stored.value,
+        "fixture.write_tool",
+    )
+    .unwrap();
+    let mut bindings = engine.workspace.config().value.bindings.clone();
+    bindings[0].allow_write = true;
+    bindings[0].tools.insert("write_record".into());
+    let revision = engine.workspace.config().revision;
+    engine
+        .configure(revision, ConfigCommand::SetBindings { bindings })
+        .unwrap();
+    let run = engine
+        .submit(
+            "write-test",
+            TaskInput {
+                prompt: "Verify write denial".into(),
+                ..Default::default()
+            },
+            1,
+        )
+        .unwrap();
+    engine
+        .claim(1, "local", chrono::Utc::now().timestamp())
+        .unwrap();
+    let cursor = engine.workspace.db.last_sequence().unwrap();
+    drop(engine);
+    let grant = issue(&state, &run.task_ids[0]).await.unwrap();
+    let (_, denied) = call(&state, grant.token.expose(), "polymas_read_source", json!({"connectionId":connection_id,"namespace":"shared","tool":"write_record","arguments":{}})).await;
+    assert_eq!(denied["isError"], true);
+    assert!(
+        !state
+            .engine
+            .lock()
+            .await
+            .workspace
+            .db
+            .events(cursor, 100, None)
+            .unwrap()
+            .iter()
+            .any(|e| e.input.kind == "mcp.call_started")
+    );
 }

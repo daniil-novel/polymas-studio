@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D10 actual Codex finding: PID 24540 обнаружил файловый источник, но Codex отклонил polymas_call_source до gateway как потенциальную запись (`user cancelled MCP tool call`). Это не успешный read smoke. RED нового regression показал отсутствие отдельного read interface. GREEN polymas_read_source объявлен read-only и отклоняет разрешённый write tool до call_started; пять gateway tests и clippy. Политика approval/sandbox не ослаблялась. [Codex MCP approval modes](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) проверены 2026-09-08.
+
 D10 source credential review: RED отсутствовал sanitizer успешного MCP результата. GREEN вложенные content/structuredContent и ключи очищены от точных значений bearer/env secrets, обычный текст сохранён; два connection tests и clippy. Это защита от прямого echo, не обещание обнаружения произвольного кодирования секрета внешним сервером.
 
 D10f: RED отсутствующий configure_gateway. GREEN execution fixture проверяет gateway launch/env, scoped context во время настоящего дочернего процесса и 401 после сохранения результата. Два runtime tests и clippy. Реальный Codex MCP smoke выполняется отдельно после коммита.
