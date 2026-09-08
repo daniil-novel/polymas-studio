@@ -284,11 +284,11 @@ impl Scheduler {
                 && (-100..=100).contains(&input.priority),
             "Некорректные поля задачи",
         )?;
-        require(
-            self.tasks.len() < 100_000,
-            "Архивируйте историю перед добавлением задач",
-        )?;
         let recipients = architecture.resolve(registry, &input.target)?;
+        require(
+            self.tasks.len().saturating_add(recipients.len()) <= 100_000,
+            "Рабочий набор вместе с новым пакетом не должен превышать 100 000 задач",
+        )?;
         if architecture.admission == Admission::StartAll
             && (recipients.len() > available_slots
                 || recipients.len() > architecture.max_concurrency)
