@@ -5,6 +5,37 @@ import { TaskDetail } from '../../apps/desktop/src/TaskDetail';
 import { ApiClient } from '../../apps/desktop/src/api';
 import type { Task } from '../../apps/desktop/src/types';
 afterEach(cleanup);
+test('waiting shows an intermediate summary and a deadline, permits cancellation and refreshes after wake', async () => {
+  const client = new ApiClient();
+  const waiting = {
+    ...fixture('wait'),
+    state: 'waiting' as const,
+    result: 'Нужны доказательства',
+    waiting: { sender: 'peer-2', correlationId: null, deadlineAt: 1900000000 },
+  };
+  vi.spyOn(client, 'request')
+    .mockResolvedValueOnce(waiting)
+    .mockResolvedValue({ ...fixture('wait'), result: 'Ответ после сообщения' });
+  const command = vi.fn().mockResolvedValue({ ok: true });
+  render(
+    <TaskDetail
+      taskId="wait"
+      client={client}
+      command={command}
+      events={[]}
+      agentName="Первый"
+      onContinue={vi.fn()}
+    />,
+  );
+  expect(await screen.findByText('Промежуточная сводка')).toBeTruthy();
+  expect(screen.getByText('peer-2')).toBeTruthy();
+  expect(screen.getByText(/Слот исполнителя свободен/)).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Отменить задачу' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Принять результат' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Продолжить диалог' })).toBeNull();
+  expect(await screen.findByText('Ответ после сообщения', {}, { timeout: 3500 })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Принять результат' })).toBeTruthy();
+});
 const fixture = (id: string): Task =>
   ({
     id,

@@ -1,5 +1,11 @@
 # Проверки реализации
 
+D10k UI: RED ожидание отображалось как idle и итоговый результат без отмены/дальнейшего polling. GREEN 23 frontend tests, typecheck/lint/build; ожидающий узел не светится, после wake карточка обновляется. CUA проверил настоящий waiting через accessibility tree и итоговую карточку screenshot 1600×1000; изображение именно wait-панели ещё не захвачено. Browser console errors/warnings: 0. Полная Rust suite и clippy пройдены; opt-in vault test закономерно skipped.
+
+Actual Codex wait/message: run_7191fd56-0a32-4afc-be64-0093d753682e, task_ffd656ef-6350-415a-9d8c-28e73c9c8d17 PID 10232 → waiting → PID 22588, одна и та же sessionId. Второй task_99648c94-ce21-4c43-bb0e-be432b9c0978 PID 7772 с другой sessionId отправил SENT:POLYMAS-WAIT-64; первый вернул RESUMED:POLYMAS-WAIT-64. По одному wait_requested/woken/queued/delivered/ack. C=1; очередь кратко приостановлена для осмотра, затем продолжена. Оба результата приняты через UI. Все prompts/markers — собственные fixtures.
+
+Actual deadline attempt 1: task_7325bc7e-ad6e-4261-8e70-96747ce64410 PID 15012 не вызвал gateway. В собственной provider fixture найден TypeError: модель нашла имя в ALL_TOOLS, но попыталась вызвать короткий alias tools.polymas_wait_for_message. Это не отказ gateway; результата ожидания нет, smoke не принят. Требуется пояснить точное обнаруженное имя инструмента в runtime context и повторить проверку; не ослаблять sandbox.
+
 D10j: RED directive давал awaiting_acceptance вместо waiting; дополнительный RED другая сессия того же агента подменяла продолжение. GREEN C=1: первый агент ждёт, второй отправляет, первый возобновляется с прежней task session и сообщением; промежуточный артефакт partial, active registry очищен. Один wait runtime fixture, три OS runtime fixtures, семь gateway tests и clippy. Wait executor имитирует reap и не считается реальной моделью/процессом; отдельный actual smoke следует далее.
 
 D10i: RED неизвестный polymas_wait_for_message. GREEN одинаковый повтор сохраняет первоначальный deadline, конфликт и чужой sender отклонены, directive записан в БД, задача остаётся running до reap. Семь gateway tests и clippy пройдены; runtime ещё не применяет directive.

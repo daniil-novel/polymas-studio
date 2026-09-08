@@ -55,7 +55,13 @@ export function projectGraph(
   const states = new Map<string, TaskSummary>();
   for (const task of tasks) {
     if (['running', 'stopping', 'unknown'].includes(task.state)) states.set(task.assignee, task);
-    else if (task.state === 'queued' && !states.has(task.assignee)) states.set(task.assignee, task);
+    else if (
+      task.state === 'queued' &&
+      (!states.has(task.assignee) || states.get(task.assignee)?.state === 'waiting')
+    )
+      states.set(task.assignee, task);
+    else if (task.state === 'waiting' && !states.has(task.assignee))
+      states.set(task.assignee, task);
   }
   const ownership = new Map<string, string>();
   const coordinators = new Set<string>();

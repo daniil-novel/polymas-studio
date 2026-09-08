@@ -164,11 +164,37 @@
   color: var(--mint);
 }
 .task-state-awaiting_acceptance,
+.task-state-waiting,
 .task-state-unknown {
   color: var(--warning);
 }
 .task-state-failed {
   color: var(--error);
+}
+.wait-panel {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.wait-panel p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+.wait-panel dl {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 8px;
+}
+.wait-panel dt {
+  color: var(--muted);
+}
+.wait-panel dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 .artifact-ids {
   display: grid;

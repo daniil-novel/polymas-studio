@@ -31,6 +31,18 @@ const arch = (patch: Partial<Architecture> = {}): Architecture => ({
   ...patch,
 });
 const now = Date.parse('2026-09-08T10:00:00Z');
+test('a waiting agent is visible without a process glow and an active task takes precedence', () => {
+  const tasks = [{ assignee: 'a0', state: 'waiting', lease: null }] as TaskSummary[];
+  expect(
+    projectGraph(agents(1), arch(), tasks, [], true, now).nodes.map((n) => [n.state, n.active]),
+  ).toEqual([['waiting', false]]);
+  tasks.push({
+    assignee: 'a0',
+    state: 'running',
+    lease: { heartbeatAt: now / 1000 },
+  } as TaskSummary);
+  expect(projectGraph(agents(1), arch(), tasks, [], true, now).nodes[0].state).toBe('running');
+});
 test('regrouping releases automatic positions but preserves manually pinned coordinates', () => {
   const before = [
     { id: 'a0', group: 'old' },

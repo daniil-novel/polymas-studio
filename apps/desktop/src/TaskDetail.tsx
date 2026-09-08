@@ -17,6 +17,8 @@ const eventNames: Record<string, string> = {
   'runtime.error': 'Ошибка исполнителя',
   'task.state_changed': 'Состояние задачи изменено',
   'task.result_saved': 'Результат сохранён',
+  'task.wait_requested': 'Агент запросил ожидание',
+  'task.woken': 'Задача продолжена после ожидания',
 };
 export function TaskDetail({
   taskId,
@@ -55,7 +57,7 @@ export function TaskDetail({
         if (abort.signal.aborted) return;
         setTask(value);
         setError('');
-        if (['queued', 'running', 'stopping'].includes(value.state))
+        if (['queued', 'waiting', 'running', 'stopping'].includes(value.state))
           timer = setTimeout(() => void read(), 2000);
       } catch (reason) {
         if (!abort.signal.aborted)
@@ -134,10 +136,37 @@ export function TaskDetail({
             </div>
           )}
           {current.error && <p className="form-error">{current.error}</p>}
+          {current.state === 'waiting' && current.waiting && (
+            <div className="wait-panel" role="status">
+              <strong>Ожидание ответа</strong>
+              <p>
+                Слот исполнителя свободен. Задача продолжится после подходящего сообщения или по
+                истечении срока.
+              </p>
+              <dl>
+                <dt>Отправитель</dt>
+                <dd>{current.waiting.sender ?? 'Любой разрешённый агент'}</dd>
+                <dt>Срок ожидания</dt>
+                <dd>
+                  <time dateTime={new Date(current.waiting.deadlineAt * 1000).toISOString()}>
+                    {new Date(current.waiting.deadlineAt * 1000).toLocaleString('ru')}
+                  </time>
+                </dd>
+                {current.waiting.correlationId && (
+                  <>
+                    <dt>Цепочка сообщений</dt>
+                    <dd>{current.waiting.correlationId}</dd>
+                  </>
+                )}
+              </dl>
+            </div>
+          )}
           {current.result ? (
             <div className="conversation-message assistant-message">
               <div className="result-heading">
-                <span className="message-author">Результат агента</span>
+                <span className="message-author">
+                  {current.state === 'waiting' ? 'Промежуточная сводка' : 'Результат агента'}
+                </span>
                 <button
                   className="icon-button"
                   aria-label="Скопировать результат"
@@ -198,7 +227,7 @@ export function TaskDetail({
                 </button>
               </>
             )}
-            {['queued', 'running', 'stopping'].includes(current.state) && (
+            {['queued', 'waiting', 'running', 'stopping'].includes(current.state) && (
               <button
                 disabled={busy || current.state === 'stopping'}
                 onClick={() => void act('cancel')}
@@ -207,11 +236,12 @@ export function TaskDetail({
                 {current.state === 'stopping' ? 'Остановка…' : 'Отменить задачу'}
               </button>
             )}
-            {onContinue && !['running', 'stopping', 'unknown'].includes(current.state) && (
-              <button disabled={busy} onClick={() => onContinue(current.assignee)}>
-                Продолжить диалог
-              </button>
-            )}
+            {onContinue &&
+              !['queued', 'waiting', 'running', 'stopping', 'unknown'].includes(current.state) && (
+                <button disabled={busy} onClick={() => onContinue(current.assignee)}>
+                  Продолжить диалог
+                </button>
+              )}
           </div>
           {['unknown', 'failed', 'cancelled', 'rejected'].includes(current.state) && (
             <div className="recovery-panel">
