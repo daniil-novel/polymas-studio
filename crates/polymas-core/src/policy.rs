@@ -293,6 +293,22 @@ impl ApprovalLedger {
         })
     }
     pub fn complete(db: &mut Store, id: &str, state: ApprovalState) -> Result<Approval> {
+        Self::complete_with_result(db, id, state, None)
+    }
+    /// A private sanitized result and its outcome commit atomically. Activity
+    /// events contain metadata only; a repeated call never changes this receipt.
+    pub fn complete_with_result(
+        db: &mut Store,
+        id: &str,
+        state: ApprovalState,
+        result: Option<Value>,
+    ) -> Result<Approval> {
+        if let Some(value) = &result {
+            require(
+                serde_json::to_vec(value)?.len() <= 4 * 1024 * 1024 + 8192,
+                "Результат операции слишком велик",
+            )?;
+        }
         require(
             matches!(
                 state,
@@ -310,6 +326,9 @@ impl ApprovalLedger {
             )?;
             stored.value.state = state;
             tx.put("approvals", id, stored.revision, &stored.value)?;
+            if let Some(result) = &result {
+                tx.put("approval_results", id, 0, result)?;
+            }
             tx.emit(
                 EventInput::new(
                     "approval.execution_finished",

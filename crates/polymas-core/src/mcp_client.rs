@@ -56,6 +56,8 @@ async fn connect(
         ConnectionTransport::Http { url } => {
             let client = reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
+                // Audited write operations must not be retransmitted by HTTP policy.
+                .retry(reqwest::retry::never())
                 .connect_timeout(Duration::from_secs(10))
                 .timeout(deadline)
                 .build()

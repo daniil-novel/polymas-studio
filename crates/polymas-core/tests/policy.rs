@@ -18,6 +18,76 @@ fn operation() -> Operation {
     }
 }
 #[test]
+fn execution_result_and_outcome_commit_together_and_survive_reopen() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("receipts.db");
+    let mut db = Store::open(&path).unwrap();
+    let first = ApprovalLedger::request(&mut db, operation(), 100, 60).unwrap();
+    ApprovalLedger::decide(&mut db, &first.id, true, 101).unwrap();
+    ApprovalLedger::consume(&mut db, &first.id, &first.operation, 102).unwrap();
+    let result = json!({"response":{"content":[{"text":"private-receipt-data"}]}});
+    ApprovalLedger::complete_with_result(
+        &mut db,
+        &first.id,
+        ApprovalState::Succeeded,
+        Some(result.clone()),
+    )
+    .unwrap();
+    let other = ApprovalLedger::request(&mut db, operation(), 100, 60).unwrap();
+    ApprovalLedger::decide(&mut db, &other.id, true, 101).unwrap();
+    ApprovalLedger::consume(&mut db, &other.id, &other.operation, 102).unwrap();
+    db.transaction(|tx| {
+        tx.put(
+            "approval_results",
+            &other.id,
+            0,
+            &json!({"existing":"receipt"}),
+        )
+    })
+    .unwrap();
+    let head = db.last_sequence().unwrap();
+    assert!(
+        ApprovalLedger::complete_with_result(
+            &mut db,
+            &other.id,
+            ApprovalState::Succeeded,
+            Some(result.clone())
+        )
+        .is_err()
+    );
+    assert_eq!(db.last_sequence().unwrap(), head);
+    drop(db);
+    let db = Store::open(&path).unwrap();
+    assert_eq!(
+        db.get::<serde_json::Value>("approval_results", &first.id)
+            .unwrap()
+            .unwrap()
+            .value,
+        result
+    );
+    assert_eq!(
+        db.get::<polymas_core::policy::Approval>("approvals", &first.id)
+            .unwrap()
+            .unwrap()
+            .value
+            .state,
+        ApprovalState::Succeeded
+    );
+    assert_eq!(
+        db.get::<polymas_core::policy::Approval>("approvals", &other.id)
+            .unwrap()
+            .unwrap()
+            .value
+            .state,
+        ApprovalState::Executing
+    );
+    assert!(
+        !json!(db.events(0, 100, None).unwrap())
+            .to_string()
+            .contains("private-receipt-data")
+    );
+}
+#[test]
 fn approval_debug_never_exposes_private_operation_arguments() {
     let mut db = Store::memory().unwrap();
     let mut op = operation();

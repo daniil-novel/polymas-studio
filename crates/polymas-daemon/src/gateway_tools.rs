@@ -75,7 +75,7 @@ async fn dispatch(state: &AppState, scope: &Scope, input: ToolCall) -> Result<Va
         .try_acquire()
         .map_err(|_| Error::Capacity("Дождитесь завершения текущего вызова инструмента".into()))?;
     match input.name.as_str() {
-        "polymas_request_operation" | "polymas_operation_status" => {
+        "polymas_request_operation" | "polymas_operation_status" | "polymas_execute_operation" => {
             crate::gateway_operations::dispatch(state, scope, &input.name, input.arguments)
                 .await
                 .map(success)

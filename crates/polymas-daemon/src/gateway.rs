@@ -19,7 +19,10 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 #[derive(Clone, Debug, Serialize)]
@@ -32,6 +35,8 @@ pub struct Scope {
     pub expires_at: i64,
     #[serde(skip)]
     pub call_limit: Arc<tokio::sync::Semaphore>,
+    #[serde(skip)]
+    revoked: Arc<AtomicBool>,
 }
 #[derive(Clone, Default)]
 pub struct Scopes(Arc<Mutex<BTreeMap<String, Scope>>>);
@@ -45,9 +50,11 @@ pub struct Grant {
     pub token: Secret,
     key: String,
     scopes: Scopes,
+    revoked: Arc<AtomicBool>,
 }
 impl Drop for Grant {
     fn drop(&mut self) {
+        self.revoked.store(true, Ordering::Release);
         if let Ok(mut scopes) = self.scopes.0.lock() {
             scopes.remove(&self.key);
         }
@@ -70,6 +77,7 @@ pub async fn issue(state: &AppState, task_id: &str) -> Result<Grant> {
             .epoch,
         expires_at: chrono::Utc::now().timestamp() + task.role.draft.timeout_seconds as i64 + 30,
         call_limit: Arc::new(tokio::sync::Semaphore::new(1)),
+        revoked: Arc::new(AtomicBool::new(false)),
     };
     validate(&engine, &scope)?;
     let token = Secret::new(format!(
@@ -89,16 +97,19 @@ pub async fn issue(state: &AppState, task_id: &str) -> Result<Grant> {
             "Для попытки уже выдан доступ или исчерпана ёмкость".into(),
         ));
     }
+    let revoked = scope.revoked.clone();
     scopes.insert(key.clone(), scope);
     Ok(Grant {
         token,
         key,
         scopes: state.gateway_scopes.clone(),
+        revoked,
     })
 }
 pub fn validate(engine: &Engine, scope: &Scope) -> Result<()> {
     let task = engine.scheduler.task(&scope.task_id)?;
-    if task.state != TaskState::Running
+    if scope.revoked.load(Ordering::Acquire)
+        || task.state != TaskState::Running
         || task.assignee != scope.agent_id
         || task.run_id != scope.run_id
         || task.lease.as_ref().is_none_or(|l| l.epoch != scope.epoch)

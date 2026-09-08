@@ -34,6 +34,7 @@ pub fn definition() -> Value {
 pub async fn request(state: &AppState, scope: &Scope, input: WaitInput) -> Result<Value> {
     let mut engine = state.engine.lock().await;
     validate(&engine, scope)?;
+    crate::gateway_operations::require_previous_resolved(&engine, scope)?;
     require(
         polymas_core::policy::ApprovalLedger::for_attempt(
             &engine.workspace.db,
