@@ -52,6 +52,15 @@ impl ApprovalLedger {
         timestamp: i64,
         ttl_seconds: i64,
     ) -> Result<Approval> {
+        db.transaction(|tx| Self::request_in(tx, request_key, operation, timestamp, ttl_seconds))
+    }
+    pub(crate) fn request_in(
+        tx: &WriteTransaction<'_>,
+        request_key: &str,
+        operation: Operation,
+        timestamp: i64,
+        ttl_seconds: i64,
+    ) -> Result<Approval> {
         require(
             !request_key.trim().is_empty() && request_key.len() <= 200,
             "Укажите ключ запроса разрешения",
@@ -59,39 +68,36 @@ impl ApprovalLedger {
         let key = attempt_key(&operation.task_id, operation.origin_epoch)?;
         let fingerprint = operation.fingerprint()?;
         let request_key_hash = format!("{:x}", Sha256::digest(request_key.as_bytes()));
-        db.transaction(|tx| {
-            if let Some(receipt) = tx.get::<AttemptRequest>("approval_attempts", &key)? {
-                if receipt.value.request_key_hash != request_key_hash
-                    || receipt.value.fingerprint != fingerprint
-                {
-                    return Err(Error::Conflict(
-                        "В этой попытке уже запрошена другая операция; завершите текущий turn"
-                            .into(),
-                    ));
-                }
-                let approval = tx
-                    .get::<Approval>("approvals", &receipt.value.approval_id)?
-                    .ok_or_else(|| Error::Storage("Разрешение попытки отсутствует".into()))?
-                    .value;
-                require(
-                    approval.fingerprint == fingerprint,
-                    "Разрешение попытки изменилось",
-                )?;
-                return Ok(approval);
+        if let Some(receipt) = tx.get::<AttemptRequest>("approval_attempts", &key)? {
+            if receipt.value.request_key_hash != request_key_hash
+                || receipt.value.fingerprint != fingerprint
+            {
+                return Err(Error::Conflict(
+                    "В этой попытке уже запрошена другая операция; завершите текущий turn".into(),
+                ));
             }
-            let approval = create(tx, operation, timestamp, ttl_seconds)?;
-            tx.put(
-                "approval_attempts",
-                &key,
-                0,
-                &AttemptRequest {
-                    approval_id: approval.id.clone(),
-                    request_key_hash,
-                    fingerprint,
-                },
+            let approval = tx
+                .get::<Approval>("approvals", &receipt.value.approval_id)?
+                .ok_or_else(|| Error::Storage("Разрешение попытки отсутствует".into()))?
+                .value;
+            require(
+                approval.fingerprint == fingerprint,
+                "Разрешение попытки изменилось",
             )?;
-            Ok(approval)
-        })
+            return Ok(approval);
+        }
+        let approval = create(tx, operation, timestamp, ttl_seconds)?;
+        tx.put(
+            "approval_attempts",
+            &key,
+            0,
+            &AttemptRequest {
+                approval_id: approval.id.clone(),
+                request_key_hash,
+                fingerprint,
+            },
+        )?;
+        Ok(approval)
     }
     pub fn for_attempt(db: &Store, task_id: &str, epoch: u64) -> Result<Option<Approval>> {
         let key = attempt_key(task_id, epoch)?;

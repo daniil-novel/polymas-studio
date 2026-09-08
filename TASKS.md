@@ -31,6 +31,7 @@
   - [x] D10n. Scheduler waiting_user: освобождение lease после reap, persisted approval ID/origin epoch, точное продолжение и отмена/turn budget/first-accepted. Проверка исхода операции и runtime wiring далее.
   - [x] D10o. Резервирование epoch продолжения без process slot; порядок задач экземпляра, сохранение после restart и необратимое погашение при отмене/crash. [ADR-017](specs/adr/017-approval-continuation.md); atomic approval wiring далее.
   - [x] D10p. Fingerprint включает originEpoch и отдельный future epoch; receipt ищется по исходному turn, legacy без origin fail closed. Atomic request в Engine далее.
+  - [x] D10q. Engine атомарно сохраняет reservation/approval/receipt; сам задаёт identity, future epoch, connection revision и resource hash, проверяет live∩pinned write scope. Runtime/gateway/UI далее.
 - [x] D11. Источники, утверждения, связи и происхождение знаний; UI/gateway следуют отдельно.
 - [ ] D12. Артефакты с hash, экспорт, backup и восстановление.
   - [x] D12a. Content-addressed артефакты, provenance и безопасный импорт.

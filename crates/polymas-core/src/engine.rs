@@ -5,6 +5,8 @@ use crate::storage::EventInput;
 use crate::workspace::{ConfigCommand, Workspace};
 use serde_json::{Value, json};
 use std::path::Path;
+mod approvals;
+pub use approvals::OperationRequest;
 
 /// Synchronous transactional application layer. The daemon owns one Engine
 /// behind a short mutex; provider and MCP I/O always run outside this mutex.
