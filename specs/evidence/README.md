@@ -32,5 +32,6 @@
 | D13e | `/api/runs` возвращал 404; readiness/control regression FAILED | HTTP tests; `smoke_service.py --allow-provider`: реальный Codex 0.144.1 / ChatGPT, PID 28760 → 29520, точный resume, 2 artifacts, 2 принятые задачи | 2 коротких turn без инструментов; не concurrency/soak gate |
 | D14a | App/API imports отсутствовали, Vitest FAILED | UI не выдумывает агентов/активность при empty registry; unauthorized state видим; TS/lint/4 tests/build | Визуальная сверка и полноценные формы следуют отдельными срезами |
 | D03 follow-up | Имена оставляли literal `{n:02}`, registry regression FAILED | Zero padding 01/02 и atomic reject неподдерживаемого шаблона | Все 5 registry tests |
+| D15a | RoleEditor import отсутствовал; отдельный RED stale-role form | UI сначала сохраняет роль, затем создаёт точное N по полученным ID/revision; внешняя новая версия блокирует старую форму | Browser/computer-use выполняется на интегрированном приложении отдельно |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.

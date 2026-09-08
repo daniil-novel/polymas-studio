@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { ApiClient, createClient } from './api';
 import { useWorkspace } from './useWorkspace';
+import { RoleEditor } from './RoleEditor';
 import { agentState, stateLabels, type Agent } from './types';
 import './styles.css';
 
@@ -285,32 +286,9 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                     </div>
                   </>
                 )}
-                {page === 'agents' && (
-                  <>
-                    <div className="section-heading">
-                      <div>
-                        <h2>Роли и экземпляры</h2>
-                        <p className="muted">
-                          Каждый экземпляр получает собственный процесс и сессию Codex.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="agent-grid">
-                      {filtered.map((a) => (
-                        <button className="agent-card" key={a.id} onClick={() => select(a)}>
-                          <Users size={18} />
-                          <strong>{a.name}</strong>
-                          <span className="small muted">
-                            {a.id.slice(-8)} · v{a.roleVersion}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    {agents.length === 0 && (
-                      <p className="muted">В этой рабочей области ещё нет экземпляров.</p>
-                    )}
-                  </>
-                )}
+                <div hidden={page !== 'agents'}>
+                  <RoleEditor snapshot={snapshot} command={data.command} />
+                </div>
                 {page === 'tasks' && (
                   <>
                     <h2>Задачи системы</h2>
