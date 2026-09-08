@@ -1,4 +1,5 @@
 //! Local authenticated control plane. The desktop and worker bridge use separate credentials.
+pub mod bridge;
 pub mod connection_api;
 pub mod gateway;
 pub mod gateway_tools;

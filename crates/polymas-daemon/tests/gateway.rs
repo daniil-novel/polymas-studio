@@ -284,3 +284,68 @@ async fn source_discovery_and_calls_apply_live_and_pinned_bindings_and_record_re
         true
     );
 }
+
+#[tokio::test]
+async fn a_real_stdio_bridge_initializes_lists_tools_and_reads_through_scoped_http() {
+    use rmcp::{ServiceExt, model::CallToolRequestParams, transport::TokioChildProcess};
+    let (_dir, state, task_id) = setup().await;
+    let grant = issue(&state, &task_id).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let service_state = state.clone();
+    let service = tokio::spawn(async move {
+        axum::serve(listener, router(service_state)).await.unwrap();
+    });
+    let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_polymas-daemon"));
+    command
+        .args(["--gateway-port", &port.to_string()])
+        .env("POLYMAS_GATEWAY_TOKEN", grant.token.expose())
+        .env_remove("POLYMAS_CONTROL_TOKEN");
+    let transport = TokioChildProcess::builder(command)
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap()
+        .0;
+    let mut client = tokio::time::timeout(std::time::Duration::from_secs(8), ().serve(transport))
+        .await
+        .unwrap()
+        .expect("the trusted bridge must initialize as an MCP server");
+    let tools = client.list_all_tools().await.unwrap();
+    assert!(tools.iter().any(|t| t.name == "polymas_list_sources"));
+    let catalog = client
+        .call_tool(
+            CallToolRequestParams::new("polymas_list_sources")
+                .with_arguments(json!({"query":"read_text"}).as_object().unwrap().clone()),
+        )
+        .await
+        .unwrap();
+    let value = serde_json::to_value(catalog).unwrap();
+    let catalog: Value =
+        serde_json::from_str(value["content"][0]["text"].as_str().unwrap()).unwrap();
+    let connection = catalog["items"][0]["connectionId"].as_str().unwrap();
+    let input = json!({"connectionId":connection,"namespace":"shared","tool":"read_text","arguments":{"root":0,"path":"guide.txt"}});
+    let result = client
+        .call_tool(
+            CallToolRequestParams::new("polymas_call_source")
+                .with_arguments(input.as_object().unwrap().clone()),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(result).unwrap()["content"][0]["text"],
+        "GATEWAY-READ-93"
+    );
+    drop(grant);
+    let denied = client
+        .call_tool(
+            CallToolRequestParams::new("polymas_list_sources").with_arguments(Default::default()),
+        )
+        .await
+        .unwrap();
+    assert_eq!(serde_json::to_value(denied).unwrap()["isError"], true);
+    client
+        .close_with_timeout(std::time::Duration::from_secs(2))
+        .await
+        .unwrap();
+    service.abort();
+}

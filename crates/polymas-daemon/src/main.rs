@@ -14,6 +14,13 @@ async fn main() {
 }
 async fn serve() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| a == "--gateway-port") {
+        polymas_core::error::require(args.len() == 2, "Gateway принимает только локальный порт")?;
+        let port = args[1]
+            .parse()
+            .map_err(|_| Error::Validation("Некорректный gateway port".into()))?;
+        return polymas_daemon::bridge::serve(port).await;
+    }
     if args.iter().any(|a| a == "--help") {
         println!(
             "PolyMAS service\n--workspace ABSOLUTE_PATH --port PORT [--slots N] [--codex ABSOLUTE_EXE] [--dev]\nPOLYMAS_CONTROL_TOKEN is supplied by the desktop launcher. Listens on 127.0.0.1 only."
