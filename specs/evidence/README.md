@@ -17,5 +17,6 @@
 | D09a | `connections` отсутствует, E0432 | Untested toggle, URL credentials/plain HTTP rejection, read-only file root and parent traversal | Файловый доступ через cap-std; внешние MCP проверяются следующим срезом |
 | D09b | `mcp_client` отсутствует, E0432 | Реальный STDIO MCP fixture: initialize → tools/list → tools/call; disabled/unlisted rejected | Neo4j endpoint/credentials пока не предоставлены; HTTP отдельный integration сценарий |
 | D09c | `secrets` отсутствует, E0432 | Secret Debug redaction; opt-in Windows Credential Manager save/load/delete собственной fixture записи | Нативный test исключён из обычного CI, выполнен отдельно на хосте |
+| D10a | `policy` отсутствует, E0432 | Single-use после reopen; изменённые аргументы/epoch/expiry отклоняются; отказ не исполняется | Gateway связывает ledger с фактическим вызовом отдельным срезом |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.

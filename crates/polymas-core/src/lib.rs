@@ -5,6 +5,7 @@ pub mod connections;
 pub mod error;
 pub mod mcp_client;
 pub mod messages;
+pub mod policy;
 pub mod process;
 pub mod registry;
 pub mod scheduler;
