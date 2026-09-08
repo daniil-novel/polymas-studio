@@ -12,6 +12,46 @@ fn fixture(directory: &std::path::Path, script: &str) -> ProcessSpec {
         environment: Default::default(),
     }
 }
+
+#[tokio::test]
+async fn confirmed_input_delivery_is_observable_and_a_broken_input_pipe_is_failure() {
+    let dir = tempfile::tempdir().unwrap();
+    let (tx, mut rx) = mpsc::channel(32);
+    let (_cancel, stop) = watch::channel(false);
+    let result = run_process(
+        fixture(
+            dir.path(),
+            "import sys; sys.stdin.read(); print('{\"type\":\"turn.completed\"}')",
+        ),
+        tx,
+        stop.clone(),
+    )
+    .await
+    .unwrap();
+    assert!(result.success);
+    let mut deliveries = vec![];
+    while let Some(event) = rx.recv().await {
+        if event.kind == "runtime.input_delivered" {
+            deliveries.push(event.body);
+        }
+    }
+    assert_eq!(
+        deliveries.len(),
+        1,
+        "stdin delivery must be confirmed after write + shutdown"
+    );
+    assert_eq!(deliveries[0]["bytes"], 13);
+    let (tx, _rx) = mpsc::channel(32);
+    let mut spec = fixture(
+        dir.path(),
+        "import os,time; os.close(0); time.sleep(.1); print('{\"type\":\"turn.completed\"}')",
+    );
+    spec.stdin = "x".repeat(2 * 1024 * 1024);
+    assert!(
+        run_process(spec, tx, stop).await.is_err(),
+        "A success event cannot hide failure to transfer the input"
+    );
+}
 #[tokio::test]
 async fn independent_processes_return_distinct_pids_and_json_events() {
     let dir = tempfile::tempdir().unwrap();

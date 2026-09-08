@@ -147,7 +147,8 @@ pub async fn run_process(
         .take()
         .ok_or_else(|| Error::Runtime("stderr недоступен".into()))?;
     let input = spec.stdin.into_bytes();
-    let input_task = tokio::spawn(async move {
+    let input_size = input.len();
+    let mut input_task = tokio::spawn(async move {
         stdin.write_all(&input).await?;
         stdin.shutdown().await
     });
@@ -156,6 +157,7 @@ pub async fn run_process(
     let mut err = [0; 4096];
     let mut tail = Vec::<u8>::new();
     let mut stdout_done = false;
+    let mut input_done = false;
     let mut stderr_done = false;
     let mut cancelled = false;
     let mut timed_out = false;
@@ -166,7 +168,7 @@ pub async fn run_process(
     heartbeat.tick().await;
     let result:Result<()>=async {
         loop {
-            if stdout_done && stderr_done && exit_status.is_some() {break;}
+            if input_done && stdout_done && stderr_done && exit_status.is_some() {break;}
             tokio::select! {
                 biased;
                 _=cancel.changed(), if !cancelled => {
@@ -174,6 +176,11 @@ pub async fn run_process(
                     if cancel.has_changed().is_err() {cancelled=true;containment.terminate();child.kill().await.ok();break;}
                 },
                 _=&mut deadline=>{timed_out=true;containment.terminate();child.kill().await.ok();break;},
+                delivered=&mut input_task, if !input_done=>{
+                    delivered.map_err(|_| Error::Runtime("Передача входа в Codex прервана".into()))??;
+                    input_done=true;
+                    emit(&sender,"runtime.input_delivered",json!({"pid":pid,"bytes":input_size})).await?;
+                },
                 status=child.wait(), if exit_status.is_none()=>{
                     exit_status=Some(status?);
                     containment.terminate();
