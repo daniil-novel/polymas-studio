@@ -1,0 +1,492 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://polymas.local/schemas/configuration-export-0.1.0.json",
+  "title": "PolyMAS materialized configuration export",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "polymas-configuration"
+    },
+    "schemaVersion": {
+      "const": "0.1.0"
+    },
+    "migrationVersion": {
+      "const": 1
+    },
+    "sourceRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "type": "string"
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "const": "codex-exec"
+        },
+        "setupRequired": {
+          "const": true
+        }
+      },
+      "required": [
+        "adapter",
+        "setupRequired"
+      ]
+    },
+    "roleVersions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/role"
+      },
+      "maxItems": 100000
+    },
+    "instances": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/instance"
+      },
+      "maxItems": 100000
+    },
+    "architecture": {
+      "$ref": "#/$defs/architecture"
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/connection"
+      },
+      "maxItems": 1000
+    },
+    "bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/binding"
+      }
+    }
+  },
+  "required": [
+    "format",
+    "schemaVersion",
+    "migrationVersion",
+    "sourceRevision",
+    "name",
+    "runtime",
+    "roleVersions",
+    "instances",
+    "architecture",
+    "connections",
+    "bindings"
+  ],
+  "$defs": {
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "instruction": {
+          "type": "string"
+        },
+        "outputContract": {
+          "type": "string"
+        },
+        "acceptanceCriteria": {
+          "type": "string"
+        },
+        "escalationRule": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sandbox": {
+          "enum": [
+            "read-only",
+            "workspace-write"
+          ]
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 86400
+        },
+        "maxTurns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "maxOutputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "name",
+        "description",
+        "instruction",
+        "outputContract",
+        "acceptanceCriteria",
+        "escalationRule",
+        "model",
+        "sandbox",
+        "timeoutSeconds",
+        "maxTurns",
+        "maxOutputTokens"
+      ]
+    },
+    "instance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "roleId": {
+          "type": "string"
+        },
+        "roleVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "archived": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "roleId",
+        "roleVersion",
+        "archived"
+      ]
+    },
+    "holon": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        },
+        "parentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5000,
+          "uniqueItems": true
+        },
+        "coordinatorAgentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inputContract": {
+          "type": "string"
+        },
+        "outputContract": {
+          "type": "string"
+        },
+        "maxTasks": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "goal",
+        "parentId",
+        "members",
+        "coordinatorAgentId",
+        "inputContract",
+        "outputContract",
+        "maxTasks"
+      ]
+    },
+    "architecture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "enum": [
+            "single",
+            "independent",
+            "network",
+            "star",
+            "holonic",
+            "custom"
+          ]
+        },
+        "maxConcurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "admission": {
+          "enum": [
+            "queue_allowed",
+            "start_all"
+          ]
+        },
+        "coordinatorAgentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "memoryEnabled": {
+          "type": "boolean"
+        },
+        "memoryConnectionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "holons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/holon"
+          },
+          "maxItems": 5000
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "from",
+              "to"
+            ]
+          },
+          "maxItems": 25000
+        },
+        "positions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": -999999,
+              "maximum": 999999
+            }
+          }
+        },
+        "messageHopLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "maxMessagesPerRun": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "paused": {
+          "const": true
+        }
+      },
+      "required": [
+        "preset",
+        "maxConcurrency",
+        "admission",
+        "coordinatorAgentId",
+        "memoryEnabled",
+        "memoryConnectionId",
+        "holons",
+        "edges",
+        "positions",
+        "messageHopLimit",
+        "maxMessagesPerRun",
+        "paused"
+      ]
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "recipe": {
+          "type": "string"
+        },
+        "transport": {
+          "enum": [
+            "files",
+            "stdio",
+            "http"
+          ]
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        },
+        "toolAllowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "desiredEnabled": {
+          "type": "boolean"
+        },
+        "setupRequired": {
+          "const": true
+        },
+        "setupFields": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "roots",
+              "url",
+              "command",
+              "args",
+              "authentication",
+              "environment",
+              "secret_environment"
+            ]
+          },
+          "maxItems": 7,
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "rootCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "recipe",
+        "transport",
+        "readOnly",
+        "timeoutSeconds",
+        "toolAllowlist",
+        "desiredEnabled",
+        "setupRequired",
+        "setupFields",
+        "rootCount"
+      ]
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "connectionId": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "enum": [
+                "agent",
+                "role"
+              ]
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ]
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "allowWrite": {
+          "type": "boolean"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        }
+      },
+      "required": [
+        "id",
+        "connectionId",
+        "subject",
+        "tools",
+        "allowWrite",
+        "required",
+        "namespace"
+      ]
+    }
+  }
+}

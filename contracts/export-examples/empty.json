@@ -1,0 +1,29 @@
+{
+  "format": "polymas-configuration",
+  "schemaVersion": "0.1.0",
+  "migrationVersion": 1,
+  "sourceRevision": 1,
+  "name": "Моя система",
+  "runtime": {
+    "adapter": "codex-exec",
+    "setupRequired": true
+  },
+  "roleVersions": [],
+  "instances": [],
+  "architecture": {
+    "preset": "network",
+    "maxConcurrency": 1,
+    "admission": "queue_allowed",
+    "coordinatorAgentId": null,
+    "memoryEnabled": false,
+    "memoryConnectionId": null,
+    "holons": [],
+    "edges": [],
+    "positions": {},
+    "messageHopLimit": 8,
+    "maxMessagesPerRun": 1000,
+    "paused": true
+  },
+  "connections": [],
+  "bindings": []
+}

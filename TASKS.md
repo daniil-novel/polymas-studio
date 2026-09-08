@@ -51,8 +51,9 @@
   - [x] D18h. Просмотр saved MCP response по частям и JSON export с SHA-256; отмена/смена карточки, corrupted reply и read retry. CU настоящего daemon fixture; Chromium download проверен, native save gate остаётся открытым.
 - [x] D11. Источники, утверждения, связи и происхождение знаний; UI/gateway следуют отдельно.
 - [ ] D12. Артефакты с hash, экспорт, backup и восстановление.
+  - [x] D12c. Переносимый owner export конкретных экземпляров/версий/архитектуры: явная проекция, connection placeholders, JSON Schema и bounded complete file до 16 МиБ. Нет session/path/secret/history fields, чтение без мутаций; экран скачивания и импорт далее. [ADR-018](specs/adr/018-portable-configuration.md).
   - [x] D12a. Content-addressed артефакты, provenance и безопасный импорт.
-  - [x] D12b. Backup/restore snapshot + blobs; переносимый экспорт конфигурации следует с workspace service.
+  - [x] D12b. Backup/restore snapshot + blobs; переносимый экспорт конфигурации реализован отдельно в D12c.
 - [ ] D13. Фоновая служба и защищённое desktop-подключение.
   - [x] D13a. Workspace service, команды конфигурации и durable history.
   - [x] D13b. Durable queue, снимки запуска, recovery и ручная сверка исхода.

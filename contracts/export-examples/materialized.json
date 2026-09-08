@@ -1,0 +1,171 @@
+{
+  "format": "polymas-configuration",
+  "schemaVersion": "0.1.0",
+  "migrationVersion": 1,
+  "sourceRevision": 4,
+  "name": "Моя система",
+  "runtime": {
+    "adapter": "codex-exec",
+    "setupRequired": true
+  },
+  "roleVersions": [
+    {
+      "id": "role_export",
+      "version": 1,
+      "name": "Исследователь",
+      "description": "",
+      "instruction": "Сравни источники и сохрани ссылки.",
+      "outputContract": "markdown",
+      "acceptanceCriteria": "",
+      "escalationRule": "При нехватке данных сообщи об ограничениях оператору.",
+      "model": null,
+      "sandbox": "read-only",
+      "timeoutSeconds": 600,
+      "maxTurns": 20,
+      "maxOutputTokens": null
+    },
+    {
+      "id": "role_export",
+      "version": 2,
+      "name": "Исследователь",
+      "description": "",
+      "instruction": "Новая инструкция",
+      "outputContract": "markdown",
+      "acceptanceCriteria": "",
+      "escalationRule": "При нехватке данных сообщи об ограничениях оператору.",
+      "model": null,
+      "sandbox": "read-only",
+      "timeoutSeconds": 600,
+      "maxTurns": 20,
+      "maxOutputTokens": null
+    }
+  ],
+  "instances": [
+    {
+      "id": "agent_export_1",
+      "name": "Агент 1",
+      "roleId": "role_export",
+      "roleVersion": 1,
+      "archived": false
+    },
+    {
+      "id": "agent_export_2",
+      "name": "Агент 2",
+      "roleId": "role_export",
+      "roleVersion": 1,
+      "archived": true
+    }
+  ],
+  "architecture": {
+    "preset": "network",
+    "maxConcurrency": 1,
+    "admission": "queue_allowed",
+    "coordinatorAgentId": null,
+    "memoryEnabled": true,
+    "memoryConnectionId": "connection_files",
+    "holons": [
+      {
+        "id": "holon_export",
+        "name": "Исследование",
+        "goal": "Проверить источники",
+        "parentId": null,
+        "members": [
+          "agent_export_1"
+        ],
+        "coordinatorAgentId": "agent_export_1",
+        "inputContract": "",
+        "outputContract": "",
+        "maxTasks": 0
+      }
+    ],
+    "edges": [],
+    "positions": {
+      "agent_export_1": [
+        1.25,
+        -20.0
+      ]
+    },
+    "messageHopLimit": 8,
+    "maxMessagesPerRun": 1000,
+    "paused": true
+  },
+  "connections": [
+    {
+      "id": "connection_files",
+      "name": "Общая память",
+      "recipe": "files",
+      "transport": "files",
+      "readOnly": true,
+      "timeoutSeconds": 30,
+      "toolAllowlist": [
+        "read_text"
+      ],
+      "desiredEnabled": true,
+      "setupRequired": true,
+      "setupFields": [
+        "roots",
+        "authentication",
+        "environment",
+        "secret_environment"
+      ],
+      "rootCount": 1
+    },
+    {
+      "id": "connection_http",
+      "name": "Общая память",
+      "recipe": "files",
+      "transport": "http",
+      "readOnly": true,
+      "timeoutSeconds": 30,
+      "toolAllowlist": [
+        "read_text"
+      ],
+      "desiredEnabled": true,
+      "setupRequired": true,
+      "setupFields": [
+        "url",
+        "authentication",
+        "environment",
+        "secret_environment"
+      ],
+      "rootCount": 0
+    },
+    {
+      "id": "connection_stdio",
+      "name": "Общая память",
+      "recipe": "files",
+      "transport": "stdio",
+      "readOnly": true,
+      "timeoutSeconds": 30,
+      "toolAllowlist": [
+        "read_text"
+      ],
+      "desiredEnabled": true,
+      "setupRequired": true,
+      "setupFields": [
+        "command",
+        "args",
+        "authentication",
+        "environment",
+        "secret_environment"
+      ],
+      "rootCount": 0
+    }
+  ],
+  "bindings": [
+    {
+      "id": "binding_export",
+      "connectionId": "connection_files",
+      "subject": {
+        "type": "agent",
+        "id": "agent_export_1"
+      },
+      "tools": [
+        "read_text"
+      ],
+      "allowWrite": false,
+      "required": true,
+      "namespace": "research/sources"
+    }
+  ]
+}

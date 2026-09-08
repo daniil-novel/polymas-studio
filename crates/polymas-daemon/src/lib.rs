@@ -3,6 +3,7 @@ mod activity;
 pub mod approval_api;
 pub mod bridge;
 pub mod connection_api;
+mod export_api;
 pub mod gateway;
 pub mod gateway_knowledge;
 pub mod gateway_messages;
@@ -129,6 +130,7 @@ pub fn router(state: AppState) -> Router {
         .merge(recording_api::routes())
         .merge(connection_api::routes())
         .merge(knowledge_api::routes())
+        .merge(export_api::routes())
         .route("/api/state", get(snapshot))
         .route("/api/configure", post(configure))
         .route("/api/events", get(events))

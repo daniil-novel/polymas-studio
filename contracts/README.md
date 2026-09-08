@@ -6,6 +6,7 @@
 |---|---|
 | [architecture.schema.json](architecture.schema.json) | Blueprint ролей, наборов экземпляров, холонов, связей, лимитов и MCP |
 | [event.schema.json](event.schema.json) | Envelope нормализованного события и строгие payload трёх ключевых типов |
+| [configuration-export.schema.json](configuration-export.schema.json) | Переносимая конфигурация конкретных экземпляров, версий ролей и placeholders подключений, по [ADR-018](../specs/adr/018-portable-configuration.md) |
 | [single-agent.json](examples/single-agent.json) | N=1, C=1, прямой агент без ядра |
 | [ten-agents.json](examples/ten-agents.json) | N=10, C=10, включая одного видимого координатора |
 | [thousand-agents.json](examples/thousand-agents.json) | N=1000, C=1000, обязательный admission всех слотов |
@@ -39,6 +40,8 @@ JSON Schema проверяет структуру. Domain validator обязан
 10. Совместимость путей, sandbox, protocol versions и capabilities.
 
 Runtime validation не заменяется проверкой JSON. Наличие корректного файла не подтверждает квоту или доступность инфраструктуры.
+
+Экспорт материализованной конфигурации имеет отдельный format/schemaVersion/migrationVersion и не является blueprint populations. Два [примера](export-examples/materialized.json) проверяются JSON Schema; Rust regressions сравнивают с ними полный результат реальной сериализации (только случайные ID нормализуются). Импорт требует новых identities, проверки ссылок/версий/топологии и повторной настройки подключений. Экспорт не содержит runtime/connection values, но сохраняет свободные тексты владельца; перед передачей файла их следует просмотреть.
 
 ## Версионирование событий
 

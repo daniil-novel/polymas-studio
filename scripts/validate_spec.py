@@ -60,7 +60,7 @@ def validate_architecture(document: dict) -> None:
 
 def main() -> None:
     validators = {}
-    for name in ("architecture", "event"):
+    for name in ("architecture", "event", "configuration-export"):
         schema = json.loads((ROOT / "contracts" / f"{name}.schema.json").read_text(encoding="utf-8"))
         Draft202012Validator.check_schema(schema)
         validators[name] = Draft202012Validator(schema, format_checker=FormatChecker())
@@ -70,6 +70,9 @@ def main() -> None:
         validators["architecture"].validate(document)
         validate_architecture(document)
     events = (ROOT / "contracts/examples/events.jsonl").read_text(encoding="utf-8").splitlines()
+    exports = sorted((ROOT / "contracts/export-examples").glob("*.json"))
+    for example in exports:
+        validators["configuration-export"].validate(json.loads(example.read_text(encoding="utf-8")))
     seen_ids = set()
     streams = {}
     for line in filter(None, events):
@@ -90,7 +93,7 @@ def main() -> None:
             target = target.split("#")[0].strip("<>")
             assert (path.parent / target).is_file(), f"Broken link: {path.relative_to(ROOT)} -> {target}"
             checked_links += 1
-    print(f"PASS: 2 schemas, {len(examples)} architectures, {len(seen_ids)} events, {checked_links} local links")
+    print(f"PASS: {len(validators)} schemas, {len(examples)} architectures, {len(exports)} exports, {len(seen_ids)} events, {checked_links} local links")
 
 
 if __name__ == "__main__":
