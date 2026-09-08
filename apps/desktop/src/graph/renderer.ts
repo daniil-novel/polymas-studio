@@ -1,5 +1,6 @@
 import { DirectedGraph } from 'graphology';
 import Sigma from 'sigma';
+import { GraphLabels } from './labels';
 import {
   GROUP_PADDING,
   IMPULSE_MS,
@@ -17,6 +18,7 @@ const colors: Record<string, string> = {
   failed: '#FF8585',
 };
 export class GraphRenderer {
+  private labels = new GraphLabels();
   private graph = new DirectedGraph();
   private sigma: Sigma;
   private worker: Worker;
@@ -41,6 +43,8 @@ export class GraphRenderer {
       labelFont: 'Inter, Segoe UI, sans-serif',
       labelSize: 12,
       labelWeight: '400',
+      defaultDrawNodeLabel: (context, data, settings) =>
+        this.labels.draw(context, data, settings.labelFont),
       defaultDrawNodeHover: (context, data, settings) => {
         if (!data.label) return;
         context.save();
@@ -89,6 +93,7 @@ export class GraphRenderer {
     };
     this.sigma.on('clickNode', ({ node }) => this.onSelect(node));
     this.sigma.on('clickStage', () => this.onSelect(null));
+    this.sigma.on('beforeRender', () => this.labels.reset());
     this.sigma.on('afterRender', () => this.draw());
     this.tick();
   }
