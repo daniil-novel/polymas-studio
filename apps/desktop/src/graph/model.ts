@@ -2,6 +2,7 @@ import type { Agent, Architecture, RuntimeEvent, TaskSummary } from '../types';
 
 export const HEARTBEAT_STALE_MS = 15_000;
 export const IMPULSE_MS = 1800;
+export const GROUP_PADDING = 60;
 export interface GraphNode {
   id: string;
   label: string;
@@ -35,10 +36,26 @@ export function stablePositions(
   pinned: Positions,
 ): Positions {
   const previous = new Map(before.map((n) => [n.id, n.group]));
+  const plan = (nodes: Pick<GraphNode, 'id' | 'group'>[]) => {
+    const counts = new Map<string, number>();
+    for (const node of nodes) counts.set(node.group, (counts.get(node.group) ?? 0) + 1);
+    const entries = [...counts].sort(([a], [b]) => a.localeCompare(b));
+    return {
+      shape: JSON.stringify(entries.map(([group, count]) => [count, group === 'memory'])),
+      indexes: new Map(entries.map(([group], index) => [group, index])),
+    };
+  };
+  const oldPlan = plan(before),
+    newPlan = plan(next);
   const result: Positions = {};
   for (const node of next) {
     if (pinned[node.id]) result[node.id] = pinned[node.id];
-    else if (previous.get(node.id) === node.group && automatic[node.id])
+    else if (
+      oldPlan.shape === newPlan.shape &&
+      oldPlan.indexes.get(node.group) === newPlan.indexes.get(node.group) &&
+      previous.get(node.id) === node.group &&
+      automatic[node.id]
+    )
       result[node.id] = automatic[node.id];
   }
   return result;
@@ -161,27 +178,73 @@ export function layoutGraph(
   const result: Positions = {};
   const groups = new Map<string, typeof nodes>();
   for (const node of nodes) {
+    if (node.kind === 'memory') continue;
     const group = groups.get(node.group) ?? [];
     group.push(node);
     groups.set(node.group, group);
   }
   const entries = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  const groupRadius = Math.max(120, Math.sqrt(nodes.length) * 30);
-  entries.forEach(([, members], g) => {
-    const angle = (g / entries.length) * Math.PI * 2 - Math.PI / 2;
-    const cx = entries.length === 1 ? 0 : Math.cos(angle) * groupRadius;
-    const cy = entries.length === 1 ? 0 : Math.sin(angle) * groupRadius;
-    members
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .forEach((node, i) => {
-        if (pinned[node.id]?.every(Number.isFinite)) result[node.id] = pinned[node.id];
-        else if (node.kind === 'memory') result[node.id] = [0, 0];
-        else {
-          const radius = 34 * Math.sqrt(i + 1);
-          const theta = i * Math.PI * (3 - Math.sqrt(5));
-          result[node.id] = [cx + radius * Math.cos(theta), cy + radius * Math.sin(theta)];
-        }
+  const clusters = entries.map(([, members]) => {
+    const points = members
+      .sort((a, b) => Number(b.coordinator) - Number(a.coordinator) || a.id.localeCompare(b.id))
+      .map((node, i) => {
+        const radius = 34 * Math.sqrt(i),
+          theta = i * Math.PI * (3 - Math.sqrt(5));
+        return { id: node.id, x: radius * Math.cos(theta), y: radius * Math.sin(theta) };
       });
+    let left = Infinity,
+      right = -Infinity,
+      top = Infinity,
+      bottom = -Infinity;
+    for (const p of points) {
+      left = Math.min(left, p.x);
+      right = Math.max(right, p.x);
+      top = Math.min(top, p.y);
+      bottom = Math.max(bottom, p.y);
+    }
+    const cx = (left + right) / 2,
+      cy = (top + bottom) / 2;
+    let radius = 0;
+    for (const p of points) {
+      p.x -= cx;
+      p.y -= cy;
+      radius = Math.max(radius, Math.hypot(p.x, p.y));
+    }
+    return { points, radius: radius + GROUP_PADDING };
   });
+  const memory = nodes.some((n) => n.kind === 'memory');
+  const maxRadius = clusters.reduce((max, cluster) => Math.max(max, cluster.radius), GROUP_PADDING);
+  const ring =
+    clusters.length <= 1
+      ? maxRadius + GROUP_PADDING + 32
+      : Math.max(
+          (maxRadius + 16) / Math.sin(Math.PI / clusters.length),
+          memory ? maxRadius + GROUP_PADDING + 32 : 0,
+        );
+  let columns = Math.ceil(Math.sqrt(clusters.length + Number(memory)));
+  if (memory && columns % 2 === 0) columns++;
+  let cell = 0;
+  clusters.forEach((cluster, index) => {
+    let cx = 0,
+      cy = 0;
+    if (clusters.length <= 8) {
+      if (clusters.length > 1 || memory) {
+        const angle = (index / clusters.length) * Math.PI * 2 - Math.PI / 2;
+        cx = Math.cos(angle) * ring;
+        cy = Math.sin(angle) * ring;
+      }
+    } else {
+      const center = (columns - 1) / 2;
+      if (memory && cell === center * columns + center) cell++;
+      cx = ((cell % columns) - center) * (2 * maxRadius + 32);
+      cy = (Math.floor(cell / columns) - center) * (2 * maxRadius + 32);
+      cell++;
+    }
+    for (const point of cluster.points) result[point.id] = [cx + point.x, cy + point.y];
+  });
+  for (const node of nodes) {
+    if (node.kind === 'memory') result[node.id] = [0, 0];
+    if (pinned[node.id]?.every(Number.isFinite)) result[node.id] = pinned[node.id];
+  }
   return result;
 }

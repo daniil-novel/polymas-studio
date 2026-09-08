@@ -1,6 +1,12 @@
 import { DirectedGraph } from 'graphology';
 import Sigma from 'sigma';
-import { IMPULSE_MS, stablePositions, type GraphProjection, type Positions } from './model';
+import {
+  GROUP_PADDING,
+  IMPULSE_MS,
+  stablePositions,
+  type GraphProjection,
+  type Positions,
+} from './model';
 
 const colors: Record<string, string> = {
   running: '#6DE0B3',
@@ -186,6 +192,9 @@ export class GraphRenderer {
       }
     }
     ctx.lineWidth = 1;
+    const origin = this.sigma.graphToViewport({ x: 0, y: 0 });
+    const unit = this.sigma.graphToViewport({ x: 1, y: 0 });
+    const padding = Math.min(45, GROUP_PADDING * Math.hypot(unit.x - origin.x, unit.y - origin.y));
     for (const [group, list] of groups)
       if (list.length > 1) {
         let left = Infinity,
@@ -204,8 +213,8 @@ export class GraphRenderer {
         ctx.ellipse(
           (left + right) / 2,
           (top + bottom) / 2,
-          (right - left) / 2 + 45,
-          (bottom - top) / 2 + 45,
+          (right - left) / 2 + padding,
+          (bottom - top) / 2 + padding,
           0,
           0,
           2 * Math.PI,
@@ -214,11 +223,12 @@ export class GraphRenderer {
         ctx.fillStyle = '#A7B3C4';
         ctx.font = '12px Segoe UI';
         ctx.textAlign = 'center';
-        ctx.fillText(
-          `${this.groupLabels[group] ?? 'Агенты'} · ${list.length}`,
-          (left + right) / 2,
-          top - 55,
-        );
+        if (right - left + 2 * padding >= 95)
+          ctx.fillText(
+            `${this.groupLabels[group] ?? 'Агенты'} · ${list.length}`,
+            (left + right) / 2,
+            top - padding - 10,
+          );
       }
     ctx.strokeStyle = '#42554E';
     ctx.setLineDash([3, 5]);

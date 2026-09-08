@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { projectGraph, layoutGraph, stablePositions } from '../../apps/desktop/src/graph/model';
 import type { Agent, Architecture, RuntimeEvent, TaskSummary } from '../../apps/desktop/src/types';
+import type { GraphNode } from '../../apps/desktop/src/graph/model';
 
 const agents = (n: number): Agent[] =>
   Array.from(
@@ -31,6 +32,36 @@ const arch = (patch: Partial<Architecture> = {}): Architecture => ({
   ...patch,
 });
 const now = Date.parse('2026-09-08T10:00:00Z');
+
+test('unequal holons and shared memory have disjoint padded bounds after a new group is added', () => {
+  const groups = [6, 4, 2, 1].flatMap((count, g) =>
+    Array.from(
+      { length: count },
+      (_, i) =>
+        ({ id: `g${g}-a${i}`, group: `g${g}`, kind: 'agent', coordinator: i === 0 }) as GraphNode,
+    ),
+  );
+  const nodes = [
+    ...groups,
+    { id: 'memory:db', group: 'memory', kind: 'memory', coordinator: false } as GraphNode,
+  ];
+  const positions = layoutGraph(nodes, {});
+  const bounds = ['g0', 'g1', 'g2', 'g3', 'memory'].map((group) => {
+    const points = nodes.filter((n) => n.group === group).map((n) => positions[n.id]);
+    const x = (Math.min(...points.map((p) => p[0])) + Math.max(...points.map((p) => p[0]))) / 2;
+    const y = (Math.min(...points.map((p) => p[1])) + Math.max(...points.map((p) => p[1]))) / 2;
+    return { x, y, radius: Math.max(...points.map((p) => Math.hypot(p[0] - x, p[1] - y))) + 50 };
+  });
+  for (let i = 0; i < bounds.length; i++)
+    for (let j = i + 1; j < bounds.length; j++) {
+      const a = bounds[i],
+        b = bounds[j];
+      expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(a.radius + b.radius);
+    }
+  expect(positions['memory:db']).toEqual([0, 0]);
+  const retained = stablePositions(groups.slice(0, 12), nodes, positions, { 'g0-a0': [42, 24] });
+  expect(retained).toEqual({ 'g0-a0': [42, 24] });
+});
 test('a waiting agent is visible without a process glow and an active task takes precedence', () => {
   const tasks = [{ assignee: 'a0', state: 'waiting', lease: null }] as TaskSummary[];
   expect(
