@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D19f: RED completed memory read не давал импульс. GREEN отдельный graph regression: knowledge/MCP success выбранного connection даёт memory→agent, failure/start/другой source/offline/expiry исключены; новых permission edges не возникает даже в independent. Полная UI suite 34 tests/typecheck/lint/build пройдена. Цвет использует violet token; реальный provider smoke следует отдельно.
+
 D19e: RED неизвестный polymas_search_knowledge. GREEN два gateway knowledge tests: source scope до limit, status/provenance, private/unknown/другой namespace/подмена actor отклонены, отключение памяти и revoke действуют в turn, включение после начала не расширяет snapshot; два read events без текста. Семь прежних gateway tests и clippy пройдены. Это protocol fixture, actual Codex smoke следует после graph wiring. Контракт локального реестра отдельно от внешнего MCP уточнён в ADR-014.
 
 D19d: RED отсутствующая scoped memory page. GREEN private/shared sources перемешаны; обход страниц limit=1 возвращает только три разрешённых утверждения, связь к скрытому источнику исключена, отсутствие namespace отклонено. Пять knowledge_commands, три knowledge tests и clippy пройдены. Это read projection; выдача agent capability проверяется отдельно в gateway.

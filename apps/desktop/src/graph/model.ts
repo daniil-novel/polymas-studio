@@ -92,6 +92,7 @@ export function projectGraph(
       };
     });
   const ids = new Set(nodes.map((n) => n.id));
+  const agentIds = new Set(ids);
   const edges = new Map<string, GraphEdge>();
   const add = (from: string, to: string) => {
     if (architecture.preset === 'single' || architecture.preset === 'independent') return;
@@ -130,6 +131,16 @@ export function projectGraph(
     for (const event of events) {
       const time = Date.parse(event.observedAt);
       if (!Number.isFinite(time) || now - time < 0 || now - time > IMPULSE_MS) continue;
+      if (
+        event.kind === 'knowledge.read_completed' ||
+        (event.kind === 'mcp.call_completed' && event.body.success === true)
+      ) {
+        const from = `memory:${event.body.connectionId}`;
+        const to = event.agentId;
+        if (typeof to === 'string' && ids.has(from) && agentIds.has(to))
+          impulses.set(event.eventId, { id: event.eventId, from, to, time, kind: 'memory' });
+        continue;
+      }
       if (event.kind !== 'message.delivered_to_context') continue;
       const { from, to } = event.body;
       if (typeof from === 'string' && typeof to === 'string' && ids.has(from) && ids.has(to)) {

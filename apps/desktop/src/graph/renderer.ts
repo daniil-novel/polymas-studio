@@ -291,15 +291,16 @@ export class GraphRenderer {
         b = points.get(impulse.to),
         progress = (now - impulse.time) / IMPULSE_MS;
       if (!a || !b || progress < 0 || progress > 1) continue;
-      ctx.strokeStyle = '#6DE0B3';
+      const color = impulse.kind === 'memory' ? '#A699F0' : '#6DE0B3';
+      ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
       if (!this.reduced.matches) {
-        ctx.fillStyle = '#B2F4DB';
-        ctx.shadowColor = '#6DE0B3';
+        ctx.fillStyle = impulse.kind === 'memory' ? '#D4CCFF' : '#B2F4DB';
+        ctx.shadowColor = color;
         ctx.shadowBlur = 12;
         ctx.beginPath();
         ctx.arc(a.x + (b.x - a.x) * progress, a.y + (b.y - a.y) * progress, 3, 0, Math.PI * 2);

@@ -132,6 +132,35 @@ test('coordinator is an existing agent, memory is an explicit non-agent node, an
   expect(graph.edges).toHaveLength(18);
   expect(projectGraph(agents(10), arch(), [], [], true, now).edges).toHaveLength(0);
 });
+
+test('memory pulses reflect completed reads of the selected connection and expire without invented permission edges', () => {
+  const topology = arch({ preset: 'independent', memoryEnabled: true, memoryConnectionId: 'db' });
+  const event = (id: string, kind: string, connectionId = 'db', success = true): RuntimeEvent => ({
+    sequence: 1,
+    eventId: id,
+    kind,
+    observedAt: new Date(now - 200).toISOString(),
+    agentId: 'a0',
+    runId: 'run',
+    body: { connectionId, success },
+  });
+  const events = [
+    event('knowledge', 'knowledge.read_completed'),
+    event('source', 'mcp.call_completed'),
+    event('failed', 'mcp.call_completed', 'db', false),
+    event('other', 'knowledge.read_completed', 'other'),
+    event('started', 'mcp.call_started'),
+  ];
+  const graph = projectGraph(agents(1), topology, [], events, true, now);
+  expect(graph.impulses.map((p) => [p.id, p.from, p.to, p.kind])).toEqual([
+    ['knowledge', 'memory:db', 'a0', 'memory'],
+    ['source', 'memory:db', 'a0', 'memory'],
+  ]);
+  expect(graph.edges).toHaveLength(0);
+  expect(projectGraph(agents(1), topology, [], events, false, now).impulses).toHaveLength(0);
+  expect(projectGraph(agents(1), topology, [], events, true, now + 3000).impulses).toHaveLength(0);
+  expect(projectGraph(agents(1), arch(), [], events, true, now).impulses).toHaveLength(0);
+});
 test('layout handles 5000 definitions deterministically with unique positions and retains pinned nodes', () => {
   const nodes = projectGraph(agents(5000), arch(), [], [], true, now).nodes;
   const first = layoutGraph(nodes, { a3: [42, 24] });

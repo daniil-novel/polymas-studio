@@ -64,6 +64,7 @@
   - [x] D19c. Трёхпанельный редактор источников/утверждений/provenance, проверка, связи и страницы; CU на настоящем daemon. Knowledge graph/indexing/gateway и replay далее.
   - [x] D19d. Storage projection для агентского чтения: обязательный namespace, конкретный connection и проверка обеих сторон связи до limit; gateway далее.
   - [x] D19e. Scoped read-only knowledge gateway, отзыв памяти/bindings и provenance; публикация агентом, graph pulses и actual Codex smoke далее.
+  - [x] D19f. Observable memory pulse в агентном графе по событиям чтения; actual provider/CU smoke далее.
 - [ ] D20. Масштабирование по правилам и ресурсные ограничения.
 - [ ] D21. Удалённые workers, enrollment, fencing и кластерный storage.
 - [ ] D22. Реальные Codex smoke/resume/concurrency и failure tests.
