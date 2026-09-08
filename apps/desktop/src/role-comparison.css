@@ -1,0 +1,121 @@
+.editor-modal.role-comparison-modal {
+  width: min(1040px, calc(100vw - 48px));
+}
+.role-comparison {
+  padding: 24px;
+  overflow-wrap: anywhere;
+}
+.role-comparison > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+.role-comparison h2 {
+  margin: 0 0 8px;
+}
+.role-comparison > header code {
+  color: var(--muted);
+  font-size: 11px;
+}
+.role-comparison > header button {
+  flex-shrink: 0;
+}
+.role-diff-selectors {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.7fr) 1fr 1fr;
+  gap: 12px;
+  margin: 20px 0;
+}
+.role-diff-selectors > label {
+  min-width: 0;
+}
+.role-diff-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+}
+.role-diff-summary label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.role-diff-summary input {
+  width: auto;
+  min-height: 0;
+}
+.role-diff-field {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  margin: 12px 0;
+  background: var(--panel);
+  overflow: hidden;
+}
+.role-diff-field > h3 {
+  font-size: 13px;
+  margin: 0;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.role-diff-field > h3 span {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.role-diff-field.changed {
+  border-left: 3px solid var(--mint);
+}
+.role-diff-field.changed > h3 span {
+  color: var(--mint);
+}
+.role-diff-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.role-diff-value {
+  padding: 12px 14px;
+  min-width: 0;
+}
+.role-diff-value + .role-diff-value {
+  border-left: 1px solid var(--border);
+}
+.role-diff-value pre {
+  font: 12px/1.6 var(--font-mono, monospace);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 210px;
+  overflow: auto;
+  margin: 10px 0 0;
+}
+.role-diff-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 11px;
+}
+.role-diff-pages button {
+  font-size: 11px;
+}
+@media (max-width: 800px) {
+  .role-comparison > header {
+    flex-direction: column;
+  }
+  .role-diff-selectors {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .role-diff-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .role-diff-value + .role-diff-value {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}

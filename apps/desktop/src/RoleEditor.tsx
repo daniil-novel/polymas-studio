@@ -3,6 +3,7 @@ import { Check, ChevronRight, FileText, Plus, Save, Shield, Terminal, Users } fr
 import type { Role, RoleDraft, Snapshot } from './types';
 import type { GraphNode } from './graph/model';
 import { AgentDirectory } from './AgentDirectory';
+import { RoleComparisonDialog, type RoleComparison } from './RoleComparisonDialog';
 import type { RefreshWorkspace } from './AgentNameEditor';
 import './roles.css';
 export type Command = (path: string, body: unknown) => Promise<unknown>;
@@ -48,6 +49,7 @@ export function RoleEditor({
   const [batchKey, setBatchKey] = useState(() => crypto.randomUUID());
   const [tab, setTab] = useState<'editor' | 'instances'>('editor');
   const [pendingRole, setPendingRole] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<RoleComparison | null>(null);
   const latest = useMemo(
     () =>
       Array.from(
@@ -185,6 +187,22 @@ export function RoleEditor({
           ))}
         </select>
       </div>
+      {current && (
+        <button
+          className="role-compare-button"
+          onClick={() =>
+            setComparison({
+              revision: snapshot.config.revision,
+              versions: snapshot.config.value.registry.roles
+                .filter((role) => role.id === current.id)
+                .map((role) => ({ ...role }))
+                .sort((a, b) => b.version - a.version),
+            })
+          }
+        >
+          Сравнить версии
+        </button>
+      )}
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -510,6 +528,14 @@ export function RoleEditor({
             </div>
           </div>
         </div>
+      )}
+      {comparison && (
+        <RoleComparisonDialog
+          comparison={comparison}
+          currentRevision={snapshot.config.revision}
+          connected={connected}
+          onClose={() => setComparison(null)}
+        />
       )}
     </div>
   );

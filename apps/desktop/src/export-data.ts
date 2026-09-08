@@ -61,12 +61,4 @@ export function saveConfigurationExport(text: string, filename: string) {
   }
 }
 
-export function exportTextPage(text: string, page: number): string {
-  let start = page * 32768;
-  let end = (page + 1) * 32768;
-  const low = (index: number) =>
-    text.charCodeAt(index) >= 0xdc00 && text.charCodeAt(index) <= 0xdfff;
-  if (start > 0 && low(start)) start--;
-  if (end < text.length && low(end)) end--;
-  return text.slice(start, end);
-}
+export { textPage as exportTextPage } from './text-pages';
