@@ -33,6 +33,7 @@
   - [x] D10p. Fingerprint включает originEpoch и отдельный future epoch; receipt ищется по исходному turn, legacy без origin fail closed. Atomic request в Engine далее.
   - [x] D10q. Engine атомарно сохраняет reservation/approval/receipt; сам задаёт identity, future epoch, connection revision и resource hash, проверяет live∩pinned write scope. Runtime/gateway/UI далее.
   - [x] D10r. Durable owner decision/CAS retry, park/restart/wake/expiry и одноразовое consume по execution index; повторная проверка области и текущего lease. HTTP/runtime/gateway/UI далее.
+  - [x] D10s. Runtime после успешного reap сохраняет partial и waiting_user; решение/expiry будит reserved turn той же task session, контекст содержит approval ID. Проверено дочерним fixture process; owner API/UI и gateway tools далее.
 - [x] D11. Источники, утверждения, связи и происхождение знаний; UI/gateway следуют отдельно.
 - [ ] D12. Артефакты с hash, экспорт, backup и восстановление.
   - [x] D12a. Content-addressed артефакты, provenance и безопасный импорт.

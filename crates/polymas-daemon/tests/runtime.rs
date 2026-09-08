@@ -15,6 +15,219 @@ use polymas_daemon::{
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 struct FixtureExecutor;
+
+struct ApprovalExecutor {
+    state: AppState,
+    connection_id: String,
+    sessions: Arc<std::sync::Mutex<Vec<Option<String>>>>,
+}
+impl Executor for ApprovalExecutor {
+    fn execute(
+        &self,
+        request: CodexRequest,
+        sender: mpsc::Sender<ProcessEvent>,
+        cancel: watch::Receiver<bool>,
+    ) -> Execution {
+        let state = self.state.clone();
+        let connection_id = self.connection_id.clone();
+        let sessions = self.sessions.clone();
+        Box::pin(async move {
+            let first = {
+                let mut seen = sessions.lock().unwrap();
+                seen.push(request.session_id.clone());
+                seen.len() == 1
+            };
+            if first {
+                let mut engine = state.engine.lock().await;
+                let task = engine
+                    .scheduler
+                    .tasks
+                    .iter()
+                    .find(|t| t.state == TaskState::Running)
+                    .unwrap()
+                    .clone();
+                engine.request_approval(
+                    "fixture",
+                    polymas_core::engine::OperationRequest {
+                        task_id: task.id,
+                        origin_epoch: task.lease.unwrap().epoch,
+                        connection_id,
+                        namespace: "fixture".into(),
+                        tool: "write".into(),
+                        arguments: serde_json::json!({"text":"runtime-fixture"}),
+                    },
+                    chrono::Utc::now().timestamp(),
+                    60,
+                )?;
+            } else {
+                assert!(request.prompt.contains("approvalId"));
+                assert!(request.prompt.contains("polymas_operation_status"));
+            }
+            FixtureExecutor.execute(request, sender, cancel).await
+        })
+    }
+}
+
+#[tokio::test]
+async fn owner_wait_reaps_process_publishes_partial_and_resumes_the_same_session() {
+    use polymas_core::{
+        connections::{Connection, ConnectionTransport, Health, ToolDescription},
+        policy::{Approval, Binding, Subject},
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let mut engine = Engine::open(dir.path()).unwrap();
+    let role = engine
+        .configure(
+            1,
+            ConfigCommand::CreateRole {
+                draft: RoleDraft {
+                    name: "Approval fixture".into(),
+                    instruction: "Request a fixture operation".into(),
+                    ..Default::default()
+                },
+            },
+        )
+        .unwrap();
+    let role_id = role["id"].as_str().unwrap().to_owned();
+    engine
+        .configure(
+            2,
+            ConfigCommand::CreateAgents {
+                key: "one".into(),
+                request: BatchRequest {
+                    role_id: role_id.clone(),
+                    role_version: 1,
+                    count: 1,
+                    name_pattern: "Writer".into(),
+                },
+            },
+        )
+        .unwrap();
+    let mut connection = Connection::files("Fixture", vec![]);
+    connection.transport = ConnectionTransport::Http {
+        url: "https://fixture.invalid/mcp".into(),
+    };
+    connection.enabled = true;
+    connection.health = Health::Ready;
+    connection.read_only = false;
+    connection.tools = vec![ToolDescription {
+        name: "write".into(),
+        description: "Fixture write".into(),
+        input_schema: serde_json::json!({"type":"object"}),
+        read_only: false,
+    }];
+    connection.tool_allowlist = vec!["write".into()];
+    let connection_id = connection.id.clone();
+    engine
+        .workspace
+        .db
+        .transaction(|tx| tx.put("connections", &connection.id, 0, &connection))
+        .unwrap();
+    engine
+        .configure(
+            3,
+            ConfigCommand::SetBindings {
+                bindings: vec![Binding {
+                    id: "writer".into(),
+                    connection_id: connection_id.clone(),
+                    subject: Subject::Role { id: role_id },
+                    namespace: "fixture".into(),
+                    tools: ["write".into()].into(),
+                    allow_write: true,
+                    required: false,
+                }],
+            },
+        )
+        .unwrap();
+    let run = engine
+        .submit(
+            "run",
+            TaskInput {
+                prompt: "Request fixture operation".into(),
+                ..Default::default()
+            },
+            1,
+        )
+        .unwrap();
+    let task_id = run.task_ids[0].clone();
+    let state = AppState::new(
+        engine,
+        "test-runtime-approval-control-token-32".into(),
+        vec![],
+    )
+    .unwrap();
+    let sessions = Arc::new(std::sync::Mutex::new(vec![]));
+    let options = RuntimeOptions::new(
+        Arc::new(ApprovalExecutor {
+            state: state.clone(),
+            connection_id,
+            sessions: sessions.clone(),
+        }),
+        1,
+    )
+    .unwrap();
+    for handle in drive_once(&state, &options).await.unwrap() {
+        handle.await.unwrap().unwrap();
+    }
+    assert!(state.active.lock().await.is_empty());
+    let (session_id, reserved_epoch, approval) = {
+        let engine = state.engine.lock().await;
+        let task = engine.scheduler.task(&task_id).unwrap();
+        assert_eq!(task.state, TaskState::WaitingUser);
+        assert!(task.lease.is_none());
+        let artifact = engine
+            .workspace
+            .db
+            .get::<polymas_core::artifacts::Artifact>("artifacts", &task.artifact_ids[0])
+            .unwrap()
+            .unwrap();
+        assert!(artifact.value.partial);
+        let runtime = engine
+            .workspace
+            .db
+            .get::<polymas_daemon::runtime::AgentRuntime>("task_runtime", &task_id)
+            .unwrap()
+            .unwrap()
+            .value;
+        let approval = engine
+            .workspace
+            .db
+            .get::<Approval>(
+                "approvals",
+                &task.approval_wait.as_ref().unwrap().approval_id,
+            )
+            .unwrap()
+            .unwrap()
+            .value;
+        (
+            runtime.session_id.unwrap(),
+            task.continuation.as_ref().unwrap().epoch,
+            approval,
+        )
+    };
+    assert!(drive_once(&state, &options).await.unwrap().is_empty());
+    state
+        .engine
+        .lock()
+        .await
+        .decide_approval(
+            &approval.id,
+            1,
+            &approval.fingerprint,
+            false,
+            chrono::Utc::now().timestamp(),
+        )
+        .unwrap();
+    for handle in drive_once(&state, &options).await.unwrap() {
+        handle.await.unwrap().unwrap();
+    }
+    assert_eq!(*sessions.lock().unwrap(), vec![None, Some(session_id)]);
+    let engine = state.engine.lock().await;
+    let task = engine.scheduler.task(&task_id).unwrap();
+    assert_eq!(task.state, TaskState::AwaitingAcceptance);
+    assert_eq!(task.lease.as_ref().unwrap().epoch, reserved_epoch);
+    assert_eq!(task.attempt, 2);
+}
 impl Executor for FixtureExecutor {
     fn execute(
         &self,

@@ -89,6 +89,7 @@ pub async fn drive_once(
         let mut engine = state.engine.lock().await;
         let timestamp = chrono::Utc::now().timestamp();
         engine.wake_waiting(timestamp)?;
+        engine.wake_approvals(timestamp)?;
         engine.claim(options.capacity, "local", timestamp)?
     };
     let mut handles = vec![];
@@ -221,6 +222,12 @@ async fn prepare(state: &AppState, task: &Task) -> Result<(CodexRequest, Attempt
     if let Some(reason) = &task.resume_note {
         prompt.push_str(&format!("\n\nПРИЧИНА ПРОДОЛЖЕНИЯ\n{reason}\nПродолжи эту же задачу; не повторяй уже выполненные внешние действия. Подтверди обработанные messageId."));
     }
+    if let Some(approval) =
+        polymas_core::policy::ApprovalLedger::for_execution(&engine.workspace.db, &task.id, epoch)?
+    {
+        prompt.push_str(&format!("\n\nОПЕРАЦИЯ ЭТОЙ ПОПЫТКИ\n{}\nУточни текущее состояние через polymas_operation_status. Только approved даёт право вызвать polymas_execute_operation с этим approvalId; аргументы уже сохранены службой. При отказе или истечении срока сообщи об ограничении, не повторяй действие другим инструментом.",
+            json!({"approvalId":approval.id,"state":approval.state,"expiresAt":approval.expires_at})));
+    }
     engine.workspace.db.transaction(|tx| {
         tx.put("attempt_contexts", &context.id, 0, &context)?;
         Ok(())
@@ -323,7 +330,16 @@ async fn execute_attempt(
                     "Условие ожидания не принадлежит текущей попытке",
                 )?;
             }
-            let partial = stopping || wait.is_some();
+            let approval = if stopping {
+                None
+            } else {
+                engine.approval_to_park(&task.id, context.epoch)?
+            };
+            require(
+                wait.is_none() || approval.is_none(),
+                "Нельзя одновременно ожидать сообщение и решение владельца",
+            )?;
+            let partial = stopping || wait.is_some() || approval.is_some();
             let artifacts = Artifacts::new(&engine.workspace.root.join("artifacts"))?;
             let artifact = artifacts.publish(
                 &mut engine.workspace.db,
@@ -338,7 +354,9 @@ async fn execute_attempt(
                 result.output.as_bytes(),
             )?;
             let mut candidate = engine.scheduler.clone();
-            if let Some(directive) = wait {
+            if let Some(approval) = approval {
+                candidate.park_approval(&task.id, context.epoch, &approval.id, result.output)?;
+            } else if let Some(directive) = wait {
                 candidate.park(
                     &task.id,
                     context.epoch,
