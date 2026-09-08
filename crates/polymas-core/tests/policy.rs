@@ -9,12 +9,56 @@ fn operation() -> Operation {
         run_id: "run-a".into(),
         namespace: "reports/team".into(),
         resource_scope_hash: "a".repeat(64),
+        origin_epoch: 6,
         epoch: 7,
         connection_id: "db".into(),
         connection_revision: 2,
         tool: "write".into(),
         arguments: json!({"path":"report.txt","text":"approved text"}),
     }
+}
+#[test]
+fn an_approval_is_bound_to_distinct_origin_and_execution_attempts() {
+    let mut value = serde_json::to_value(operation()).unwrap();
+    value["originEpoch"] = json!(6);
+    let requested: Operation = serde_json::from_value(value.clone()).unwrap();
+    let mut db = Store::memory().unwrap();
+    let approval =
+        ApprovalLedger::request_for_attempt(&mut db, "request", requested.clone(), 100, 30)
+            .unwrap();
+    assert_eq!(
+        ApprovalLedger::for_attempt(&db, "task-a", 6)
+            .unwrap()
+            .unwrap()
+            .id,
+        approval.id
+    );
+    assert!(
+        ApprovalLedger::for_attempt(&db, "task-a", 7)
+            .unwrap()
+            .is_none()
+    );
+    ApprovalLedger::decide(&mut db, &approval.id, true, 101).unwrap();
+    value["originEpoch"] = json!(5);
+    let other: Operation = serde_json::from_value(value.clone()).unwrap();
+    assert!(ApprovalLedger::consume(&mut db, &approval.id, &other, 102).is_err());
+    for origin in [0, 7, 8] {
+        value["originEpoch"] = json!(origin);
+        assert!(
+            serde_json::from_value::<Operation>(value.clone())
+                .unwrap()
+                .fingerprint()
+                .is_err()
+        );
+    }
+    value.as_object_mut().unwrap().remove("originEpoch");
+    assert!(
+        serde_json::from_value::<Operation>(value)
+            .unwrap()
+            .fingerprint()
+            .is_err()
+    );
+    ApprovalLedger::consume(&mut db, &approval.id, &requested, 102).unwrap();
 }
 #[test]
 fn attempt_requests_retry_atomically_without_duplicates_or_extending_expiry() {
@@ -37,7 +81,7 @@ fn attempt_requests_retry_atomically_without_duplicates_or_extending_expiry() {
     assert!(
         ApprovalLedger::request_for_attempt(&mut db, "request-2", operation(), 111, 30).is_err()
     );
-    let lookup = ApprovalLedger::for_attempt(&db, "task-a", 7)
+    let lookup = ApprovalLedger::for_attempt(&db, "task-a", 6)
         .unwrap()
         .unwrap();
     assert_eq!(lookup.id, first.id);
@@ -59,6 +103,7 @@ fn attempt_requests_retry_atomically_without_duplicates_or_extending_expiry() {
         ApprovalState::Denied
     );
     let mut fresh = operation();
+    fresh.origin_epoch = 7;
     fresh.epoch = 8;
     let new = ApprovalLedger::request_for_attempt(&mut db, "request-1", fresh, 140, 60).unwrap();
     assert_ne!(new.id, first.id);

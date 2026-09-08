@@ -120,6 +120,8 @@ pub struct Operation {
     pub namespace: String,
     #[serde(default)]
     pub resource_scope_hash: String,
+    #[serde(default)]
+    pub origin_epoch: u64,
     pub epoch: u64,
     pub connection_id: String,
     pub connection_revision: i64,
@@ -129,7 +131,7 @@ pub struct Operation {
 impl Operation {
     pub fn fingerprint(&self) -> Result<String> {
         require(
-            self.epoch > 0 && self.connection_revision > 0,
+            self.origin_epoch > 0 && self.epoch > self.origin_epoch && self.connection_revision > 0,
             "Операция не привязана к запуску",
         )?;
         for value in [

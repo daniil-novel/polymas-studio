@@ -56,7 +56,7 @@ impl ApprovalLedger {
             !request_key.trim().is_empty() && request_key.len() <= 200,
             "Укажите ключ запроса разрешения",
         )?;
-        let key = attempt_key(&operation.task_id, operation.epoch)?;
+        let key = attempt_key(&operation.task_id, operation.origin_epoch)?;
         let fingerprint = operation.fingerprint()?;
         let request_key_hash = format!("{:x}", Sha256::digest(request_key.as_bytes()));
         db.transaction(|tx| {
@@ -104,7 +104,7 @@ impl ApprovalLedger {
             .value;
         require(
             approval.operation.task_id == task_id
-                && approval.operation.epoch == epoch
+                && approval.operation.origin_epoch == epoch
                 && approval.fingerprint == receipt.value.fingerprint,
             "Разрешение относится к другой попытке",
         )?;
