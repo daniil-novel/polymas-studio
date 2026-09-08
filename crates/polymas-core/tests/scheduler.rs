@@ -102,6 +102,103 @@ fn a_running_agent_never_gets_a_second_turn_and_crash_outcome_is_unknown() {
     );
     assert!(s.claim_ready(10, "local", 3).unwrap().is_empty());
 }
+
+#[test]
+fn waiting_releases_capacity_preserves_identity_and_requires_a_new_fenced_attempt() {
+    use polymas_core::scheduler::WaitCondition;
+    let (r, a) = setup(2, 1);
+    let mut s = Scheduler::default();
+    s.submit("wait", &r, &a, 1, input(), 1).unwrap();
+    let first = s.claim_ready(1, "local", 100).unwrap().remove(0);
+    let epoch = first.lease.as_ref().unwrap().epoch;
+    s.park(
+        &first.id,
+        epoch,
+        WaitCondition {
+            sender: Some(r.agents[1].id.clone()),
+            correlation_id: None,
+            deadline_at: 200,
+        },
+        "Waiting for evidence".into(),
+        100,
+    )
+    .unwrap();
+    assert_eq!(s.task(&first.id).unwrap().state, TaskState::Waiting);
+    assert!(s.verify_lease(&first.id, epoch).is_err());
+    assert!(s.accept(&first.id, true).is_err());
+    s.recover_after_crash();
+    assert_eq!(s.task(&first.id).unwrap().state, TaskState::Waiting);
+    let second = s.claim_ready(1, "local", 101).unwrap().remove(0);
+    assert_ne!(second.assignee, first.assignee);
+    s.wake(&first.id, "Message became available".into())
+        .unwrap();
+    assert!(s.claim_ready(1, "local", 102).unwrap().is_empty());
+    s.finish(&second.id, second.lease.unwrap().epoch, Ok("done".into()))
+        .unwrap();
+    let resumed = s.claim_ready(1, "local", 103).unwrap().remove(0);
+    assert_eq!(resumed.assignee, first.assignee);
+    assert_eq!(resumed.attempt, 2);
+    assert!(resumed.lease.unwrap().epoch > epoch);
+    assert!(
+        s.finish(&first.id, epoch, Ok("stale result".into()))
+            .is_err()
+    );
+}
+
+#[test]
+fn stopped_or_turn_exhausted_waits_cannot_restart_the_agent() {
+    use polymas_core::scheduler::WaitCondition;
+    let (r, a) = setup(1, 1);
+    let mut s = Scheduler::default();
+    s.submit("wait", &r, &a, 1, input(), 1).unwrap();
+    let first = s.claim_ready(1, "local", 100).unwrap().remove(0);
+    let epoch = first.lease.unwrap().epoch;
+    assert!(
+        s.park(
+            &first.id,
+            epoch,
+            WaitCondition {
+                sender: None,
+                correlation_id: None,
+                deadline_at: 100
+            },
+            "Wait".into(),
+            100
+        )
+        .is_err()
+    );
+    s.task_mut(&first.id).unwrap().role.draft.max_turns = 1;
+    assert!(
+        s.park(
+            &first.id,
+            epoch,
+            WaitCondition {
+                sender: None,
+                correlation_id: None,
+                deadline_at: 200
+            },
+            "Wait".into(),
+            100
+        )
+        .is_err()
+    );
+    s.task_mut(&first.id).unwrap().role.draft.max_turns = 2;
+    s.park(
+        &first.id,
+        epoch,
+        WaitCondition {
+            sender: None,
+            correlation_id: None,
+            deadline_at: 200,
+        },
+        "Wait".into(),
+        100,
+    )
+    .unwrap();
+    s.cancel_task(&first.id).unwrap();
+    assert_eq!(s.task(&first.id).unwrap().state, TaskState::Cancelled);
+    assert!(s.wake(&first.id, "message".into()).is_err());
+}
 #[test]
 fn quorum_counts_only_accepted_results_and_role_snapshot_is_pinned() {
     let (mut r, a) = setup(3, 3);

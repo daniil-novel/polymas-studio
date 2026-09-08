@@ -48,6 +48,7 @@ impl Default for TaskInput {
 pub enum TaskState {
     Queued,
     Running,
+    Waiting,
     Stopping,
     AwaitingAcceptance,
     Accepted,
@@ -85,6 +86,32 @@ pub struct Task {
     pub created_at: String,
     pub completed_at: Option<String>,
     pub artifact_ids: Vec<String>,
+    #[serde(default)]
+    pub waiting: Option<WaitCondition>,
+    #[serde(default)]
+    pub resume_note: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WaitCondition {
+    pub sender: Option<String>,
+    pub correlation_id: Option<String>,
+    pub deadline_at: i64,
+}
+impl WaitCondition {
+    pub fn validate(&self, timestamp: i64) -> Result<()> {
+        require(
+            self.deadline_at > timestamp && self.deadline_at <= timestamp.saturating_add(86400),
+            "Ожидание должно иметь срок от 1 секунды до 24 часов",
+        )?;
+        require(
+            self.sender
+                .iter()
+                .chain(self.correlation_id.iter())
+                .all(|s| !s.is_empty() && s.len() <= 200),
+            "Некорректный адресат или correlation ID",
+        )
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -287,6 +314,8 @@ impl Scheduler {
                     created_at: now(),
                     completed_at: None,
                     artifact_ids: vec![],
+                    waiting: None,
+                    resume_note: None,
                 })
             })
             .collect::<Result<_>>()?;
@@ -471,6 +500,54 @@ impl Scheduler {
         t.completed_at = Some(now());
         Ok(())
     }
+    /// Called only after the supervisor reaped a successful yielding process.
+    pub fn park(
+        &mut self,
+        task_id: &str,
+        epoch: u64,
+        condition: WaitCondition,
+        summary: String,
+        timestamp: i64,
+    ) -> Result<()> {
+        self.verify_lease(task_id, epoch)?;
+        condition.validate(timestamp)?;
+        require(summary.len() <= 65536, "Сводка ожидания превышает 64 КиБ")?;
+        let task = self.task_mut(task_id)?;
+        require(
+            task.state == TaskState::Running && task.attempt < task.role.draft.max_turns,
+            "Ожидание невозможно после остановки или исчерпания turn budget",
+        )?;
+        task.state = TaskState::Waiting;
+        task.waiting = Some(condition);
+        task.result = Some(summary);
+        task.error = None;
+        task.completed_at = None;
+        task.lease = None;
+        Ok(())
+    }
+    /// The engine verifies the external wake condition; the scheduler only
+    /// performs the fenced state change. A cancelled wait cannot be resurrected.
+    pub fn wake(&mut self, task_id: &str, reason: String) -> Result<()> {
+        require(
+            !reason.is_empty() && reason.len() <= 1000,
+            "Нужна краткая причина пробуждения",
+        )?;
+        let task = self.task_mut(task_id)?;
+        require(
+            task.state == TaskState::Waiting && task.waiting.is_some(),
+            "Задача не ожидает события",
+        )?;
+        require(
+            task.attempt < task.role.draft.max_turns,
+            "Исчерпан turn budget роли",
+        )?;
+        task.state = TaskState::Queued;
+        task.waiting = None;
+        task.resume_note = Some(reason);
+        task.result = None;
+        task.artifact_ids.clear();
+        Ok(())
+    }
     pub fn accept(&mut self, task_id: &str, accept: bool) -> Result<()> {
         let task = self.task_mut(task_id)?;
         require(
@@ -501,8 +578,9 @@ impl Scheduler {
         };
         if run.accepted && matches!(run.input.completion, CompletionRule::FirstAccepted) {
             for t in self.tasks.iter_mut().filter(|t| t.run_id == run_id) {
-                if t.state == TaskState::Queued {
+                if matches!(t.state, TaskState::Queued | TaskState::Waiting) {
                     t.state = TaskState::Cancelled;
+                    t.waiting = None;
                 } else if t.state == TaskState::Running {
                     t.state = TaskState::Stopping;
                 }
@@ -529,7 +607,11 @@ impl Scheduler {
     pub fn cancel_task(&mut self, task_id: &str) -> Result<()> {
         let t = self.task_mut(task_id)?;
         match t.state {
-            TaskState::Queued => t.state = TaskState::Cancelled,
+            TaskState::Queued | TaskState::Waiting => {
+                t.state = TaskState::Cancelled;
+                t.waiting = None;
+                t.completed_at = Some(now());
+            }
             TaskState::Running => t.state = TaskState::Stopping,
             _ => {}
         }

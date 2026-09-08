@@ -34,6 +34,7 @@ impl Engine {
                         && matches!(
                             t.state,
                             TaskState::Queued
+                                | TaskState::Waiting
                                 | TaskState::Running
                                 | TaskState::Stopping
                                 | TaskState::Unknown
