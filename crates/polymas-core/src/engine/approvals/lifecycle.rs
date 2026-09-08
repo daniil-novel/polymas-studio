@@ -4,6 +4,22 @@ use crate::policy::ApprovalState;
 use crate::storage::Stored;
 
 impl Engine {
+    pub fn check_approval_decision(
+        &self,
+        approval: &Approval,
+        allow: bool,
+        timestamp: i64,
+    ) -> Result<()> {
+        require(
+            approval.state == ApprovalState::Pending && timestamp < approval.expires_at,
+            "Разрешение уже решено или истекло",
+        )?;
+        self.verify_reservation(approval)?;
+        if allow {
+            self.operation_connection(&approval.operation)?;
+        }
+        Ok(())
+    }
     fn operation_connection(&self, operation: &Operation) -> Result<Stored<Connection>> {
         let task = self.scheduler.task(&operation.task_id)?;
         require(
@@ -103,10 +119,7 @@ impl Engine {
             stored.revision == expected_revision,
             "Решение уже изменено; обновите карточку",
         )?;
-        self.verify_reservation(&stored.value)?;
-        if allow {
-            self.operation_connection(&stored.value.operation)?;
-        }
+        self.check_approval_decision(&stored.value, allow, timestamp)?;
         ApprovalLedger::decide(&mut self.workspace.db, id, allow, timestamp)
     }
     pub fn wake_approvals(&mut self, timestamp: i64) -> Result<Vec<String>> {

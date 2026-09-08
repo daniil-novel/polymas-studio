@@ -1,4 +1,5 @@
 //! Local authenticated control plane. The desktop and worker bridge use separate credentials.
+pub mod approval_api;
 pub mod bridge;
 pub mod connection_api;
 pub mod gateway;
@@ -122,6 +123,7 @@ impl IntoResponse for ApiError {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(run_api::routes())
+        .merge(approval_api::routes())
         .merge(recording_api::routes())
         .merge(connection_api::routes())
         .merge(knowledge_api::routes())

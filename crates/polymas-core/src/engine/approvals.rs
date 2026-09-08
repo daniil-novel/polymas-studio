@@ -77,7 +77,19 @@ impl Engine {
         };
         let approval = self.workspace.db.transaction(|tx| {
             candidate.persist_delta(&self.scheduler, tx)?;
-            ApprovalLedger::request_in(tx, key, operation, timestamp, ttl_seconds)
+            let approval = ApprovalLedger::request_in(tx, key, operation, timestamp, ttl_seconds)?;
+            if tx
+                .get::<Value>("approval_resources", &approval.id)?
+                .is_none()
+            {
+                tx.put(
+                    "approval_resources",
+                    &approval.id,
+                    0,
+                    &json!({"name":connection.value.name,"transport":connection.value.transport}),
+                )?;
+            }
+            Ok(approval)
         })?;
         self.scheduler = candidate;
         Ok(approval)
