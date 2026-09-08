@@ -24,6 +24,7 @@
   - [x] D13a. Workspace service, команды конфигурации и durable history.
   - [x] D13b. Durable queue, снимки запуска, recovery и ручная сверка исхода.
   - [x] D13c. Авторизованный локальный transport, Origin allowlist, bounded requests и replay API.
+  - [x] D13d. Execution pipeline: процесс, событие, inbox receipt, session и artifact; daemon entrypoint далее.
 - [ ] D14. Desktop shell, навигация и настоящие сохранённые данные.
 - [ ] D15. Формы ролей и массового создания экземпляров.
 - [ ] D16. WebGL-граф, поиск, layout worker и доступный список.

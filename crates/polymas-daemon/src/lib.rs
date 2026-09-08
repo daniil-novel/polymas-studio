@@ -1,4 +1,5 @@
 //! Local authenticated control plane. The desktop and worker bridge use separate credentials.
+pub mod runtime;
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Query, Request, State},
@@ -22,6 +23,7 @@ use tokio::sync::Mutex;
 #[derive(Clone)]
 pub struct AppState {
     pub engine: Arc<Mutex<Engine>>,
+    pub active: Arc<Mutex<std::collections::BTreeMap<String, tokio::sync::watch::Sender<bool>>>>,
     token: Arc<Secret>,
     allowed_origins: Arc<BTreeSet<String>>,
 }
@@ -33,6 +35,7 @@ impl AppState {
         )?;
         Ok(Self {
             engine: Arc::new(Mutex::new(engine)),
+            active: Arc::new(Mutex::new(Default::default())),
             token: Arc::new(Secret::new(token)?),
             allowed_origins: Arc::new(allowed_origins.into_iter().collect()),
         })

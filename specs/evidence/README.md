@@ -28,5 +28,6 @@
 | D13c | AppState/router отсутствуют, E0432 | Missing token/foreign Origin → 401; авторизованное редактирование → 200; stale revision → 409; данные читаются через HTTP router | Локальный owner transport; remote RBAC отдельный этап |
 | D07d | Regression FAILED: отсутствовало подтверждение stdin | Одно событие после write/shutdown; broken input pipe отклоняется при success output | Подтверждает передачу байтов процессу, не обработку сообщения моделью; ack остаётся отдельным |
 | D07d follow-up | Проверка после ed8cb82 выявила FAILED broken-pipe: Windows Tokio shutdown не flush-ит буфер | Явный flush ожидает OS write и возвращает broken-pipe; все 5 process scenarios | Исправление отдельным коммитом, не переписанной историей |
+| D13d | `runtime` отсутствует, E0432 | Реальный Python process через execution pipeline: PID, JSONL, stdin receipt, UUID session, результат и hash artifact сохранены | Protocol fixture, не OpenAI inference; реальный Codex end-to-end следует отдельно |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.
