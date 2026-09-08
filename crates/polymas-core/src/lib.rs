@@ -3,6 +3,7 @@ pub const SCHEMA_VERSION: u32 = 1;
 pub mod codex;
 pub mod connections;
 pub mod error;
+pub mod knowledge;
 pub mod mcp_client;
 pub mod messages;
 pub mod policy;

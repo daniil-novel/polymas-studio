@@ -19,5 +19,6 @@
 | D09c | `secrets` отсутствует, E0432 | Secret Debug redaction; opt-in Windows Credential Manager save/load/delete собственной fixture записи | Нативный test исключён из обычного CI, выполнен отдельно на хосте |
 | D10a | `policy` отсутствует, E0432 | Single-use после reopen; изменённые аргументы/epoch/expiry отклоняются; отказ не исполняется | Gateway связывает ledger с фактическим вызовом отдельным срезом |
 | D10b | Binding/authorize_tool отсутствуют, E0432 | Revocation, новые grants, чужой агент, disabled MCP, unlisted tool отклоняются | Namespace проверяет gateway; raw DB principal требует отдельной изоляции |
+| D11 | `knowledge` отсутствует, E0432 | Provenance после reopen; неизменяемая версия источника; namespace isolation; retention; явная проверка и contradicts | Утверждения не становятся истинными автоматически; UI/gateway далее |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.
