@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D16 follow-up: при сверке с `Architecture::permits_message` обнаружено расхождение. RED independent показывал запрещённое ребро; GREEN independent/single не показывают каналы, optional coordinator в network показывает два направления. 5 graph regression tests.
+
 D16b: RED GraphView import; GREEN поиск точного ID среди 5000 определений в DOM-списке без WebGL. TS/lint/11 tests/build. Computer use на реальном приложении: N=12, running=0, WebGL работает, миникарта видна, поиск «Исследователь · 07» показывает одну строку, выбор открывает соответствующий ID в инспекторе; browser error/warn log пуст. Форма архитектуры и взаимодействие с реальным MCP ещё не покрыты этим наблюдением.
 
 D16a: RED отсутствующий graph/model; GREEN 4 сценария: stale/disconnected без свечения, queued без импульса, dedup/expiry доставки, coordinator входит в N / memory отдельно, 5000 уникальных детерминированных координат с сохранением pinned. UI suite 10 tests + TS/lint/build. Это тест определений графа, не 5000 процессов.

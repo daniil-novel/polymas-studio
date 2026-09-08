@@ -73,11 +73,12 @@ export function projectGraph(
   const ids = new Set(nodes.map((n) => n.id));
   const edges = new Map<string, GraphEdge>();
   const add = (from: string, to: string) => {
+    if (architecture.preset === 'single' || architecture.preset === 'independent') return;
     if (from !== to && ids.has(from) && ids.has(to))
       edges.set(`${from}>${to}`, { id: `${from}>${to}`, from, to });
   };
   for (const edge of architecture.edges) add(edge.from, edge.to);
-  if (architecture.preset === 'star' && architecture.coordinatorAgentId) {
+  if (architecture.coordinatorAgentId) {
     for (const node of nodes) {
       add(architecture.coordinatorAgentId, node.id);
       add(node.id, architecture.coordinatorAgentId);

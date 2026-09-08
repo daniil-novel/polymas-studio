@@ -31,6 +31,24 @@ const arch = (patch: Partial<Architecture> = {}): Architecture => ({
   ...patch,
 });
 const now = Date.parse('2026-09-08T10:00:00Z');
+test('graph permissions match runtime for independent and optional coordinator modes', () => {
+  const withEdge = arch({
+    preset: 'independent',
+    edges: [{ from: 'a0', to: 'a1' }],
+    coordinatorAgentId: 'a0',
+  });
+  expect(projectGraph(agents(2), withEdge, [], [], true, now).edges).toHaveLength(0);
+  expect(
+    projectGraph(
+      agents(2),
+      arch({ preset: 'network', coordinatorAgentId: 'a0' }),
+      [],
+      [],
+      true,
+      now,
+    ).edges,
+  ).toHaveLength(2);
+});
 test('only fresh observed processes glow; disconnected and stale leases do not', () => {
   const tasks = [
     { assignee: 'a0', state: 'running', lease: { heartbeatAt: now / 1000 - 3 } },
