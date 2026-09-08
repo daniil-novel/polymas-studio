@@ -5,6 +5,7 @@ pub mod gateway;
 pub mod gateway_messages;
 pub mod gateway_tools;
 pub mod gateway_wait;
+pub mod knowledge_api;
 pub mod run_api;
 pub mod runtime;
 use axum::{
@@ -120,6 +121,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(run_api::routes())
         .merge(connection_api::routes())
+        .merge(knowledge_api::routes())
         .route("/api/state", get(snapshot))
         .route("/api/configure", post(configure))
         .route("/api/events", get(events))

@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D19b: RED отсутствующий knowledge HTTP route. GREEN два integration tests: unauthorized чтение отклонено, полный source → unverified claim → provenance → verified цикл, повтор source не дублируется, stale review получает 409, actor нельзя подменить, неизвестный connection отклонён. Четыре прежних HTTP tests и clippy пройдены. Проверяется локальный router/SQLite без внешнего источника; агентские права остаются отдельным gateway contract.
+
 D19a: RED отсутствующие KnowledgeCommand/page; отдельный RED показал отсутствие русского поиска без учёта регистра. GREEN четыре command/query regression: retry после reopen создаёт одну запись, изменённый payload и stale revision не проходят, failed command не оставляет receipt, namespace фильтруется до limit, expired claims не возвращают активные links, кириллица и буквальные %/_ работают. Три прежних knowledge и storage tests + clippy пройдены. API, UI и агентский доступ идут отдельными срезами.
 
 Session ownership runtime: RED чужая историческая сессия проходила через latest-only проверку, session после failed turn не сохранялась; отдельный RED показал освобождение агента до reap при rejected session event. GREEN три session_runtime, три runtime и один wait_runtime tests + clippy: проверка до запуска и до приёмки, сохранение при объявлении, cancel/drain/reap при ошибке записи. SessionExecutor/ReapingExecutor — детерминированные protocol fixtures; runtime suite использует настоящий дочерний Python-процесс, это не новое испытание провайдера. CI 94780fc завершился успешно на Windows/Linux.
