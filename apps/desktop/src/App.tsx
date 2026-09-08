@@ -13,6 +13,7 @@ import {
   Pause,
   Play,
   Plus,
+  Plug,
   Search,
   Settings2,
   Square,
@@ -28,13 +29,14 @@ import { ArchitectureEditor } from './ArchitectureEditor';
 import { Modal } from './Modal';
 import { TaskComposer } from './TaskComposer';
 import { TasksWorkspace } from './TasksWorkspace';
+import { McpWorkspace } from './McpWorkspace';
 import { agentState, stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
 import './styles.css';
 
 const defaultClient = createClient();
-type Page = 'graph' | 'agents' | 'tasks' | 'events' | 'settings';
+type Page = 'graph' | 'agents' | 'tasks' | 'mcp' | 'events' | 'settings';
 export function App({ client = defaultClient }: { client?: ApiClient }) {
   const data = useWorkspace(client);
   const { snapshot, events, connected, error } = data;
@@ -73,6 +75,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
     { id: 'graph' as const, label: 'Граф', Icon: Network },
     { id: 'agents' as const, label: 'Агенты', Icon: Users },
     { id: 'tasks' as const, label: 'Задачи', Icon: Box },
+    { id: 'mcp' as const, label: 'MCP', Icon: Plug },
     { id: 'events' as const, label: 'События', Icon: Activity },
     { id: 'settings' as const, label: 'Настройки', Icon: Settings2 },
   ];
@@ -214,7 +217,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
           </div>
         ) : (
           <>
-            <div className="view-toolbar" hidden={page === 'agents'}>
+            <div className="view-toolbar" hidden={page === 'agents' || page === 'mcp'}>
               <div className="view-heading">
                 <span className="eyebrow">
                   {page === 'graph' ? 'ЖИВАЯ АРХИТЕКТУРА' : 'РАБОЧАЯ ОБЛАСТЬ'}
@@ -300,6 +303,9 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                 )}
                 <div hidden={page !== 'agents'}>
                   <RoleEditor snapshot={snapshot} command={data.command} />
+                </div>
+                <div hidden={page !== 'mcp'}>
+                  <McpWorkspace snapshot={snapshot} command={data.command} />
                 </div>
                 <div hidden={page !== 'tasks'}>
                   <TasksWorkspace
@@ -430,7 +436,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                 </aside>
               )}
             </div>
-            <section className="timeline" hidden={page === 'agents'}>
+            <section className="timeline" hidden={page === 'agents' || page === 'mcp'}>
               <div className="timeline-header">
                 <h3>Ход выполнения</h3>
                 <span className={`live-indicator ${connected ? '' : 'offline'}`}>

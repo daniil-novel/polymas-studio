@@ -1,0 +1,297 @@
+.mcp-workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 30px;
+}
+.mcp-workspace.with-wizard {
+  grid-template-columns: minmax(320px, 0.9fr) minmax(430px, 1.1fr);
+}
+.mcp-catalog > h2 {
+  font-size: 24px;
+  margin-top: 0;
+}
+.mcp-catalog > h3 {
+  font-size: 14px;
+  color: var(--secondary);
+  margin: 30px 0 16px;
+}
+.mcp-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 20px;
+  margin: 12px 0;
+}
+.mcp-card > svg {
+  color: var(--violet);
+  flex: none;
+}
+.mcp-card:has(.lucide-folder) > svg {
+  color: var(--mint);
+}
+.mcp-card.selected {
+  border-color: var(--violet);
+}
+.mcp-card .connection-name {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+  justify-content: flex-start;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+.mcp-card strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.mcp-card small {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.mcp-health {
+  font-size: 12px;
+  color: var(--warning);
+  max-width: 120px;
+}
+.mcp-health.ready {
+  color: var(--mint);
+}
+.catalog-option {
+  justify-content: flex-start;
+  text-align: left;
+}
+.catalog-option > span {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+}
+.catalog-option > svg:last-child {
+  color: var(--muted);
+}
+.access-explainer {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-top: 28px;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.access-explainer h3 {
+  color: var(--text);
+  margin: 12px 0;
+  font-size: 16px;
+}
+.mcp-wizard {
+  border-left: 1px solid var(--border);
+  padding: 0 0 0 26px;
+  min-width: 0;
+}
+.mcp-wizard .modal-heading h2 {
+  font-size: 23px;
+}
+.wizard-steps {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  margin: 10px 0 24px;
+}
+.wizard-steps button {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  color: var(--muted);
+  flex: 1;
+}
+.wizard-steps button > span {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+}
+.wizard-steps button[aria-current='step'] {
+  color: var(--text);
+}
+.wizard-steps button[aria-current='step'] > span {
+  color: var(--canvas);
+  background: var(--mint);
+  border-color: var(--mint);
+}
+.setup-guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  font-size: 12px;
+  line-height: 1.8;
+  margin-bottom: 24px;
+}
+.setup-guide svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--secondary);
+}
+.setup-guide strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.setup-guide ol {
+  padding-left: 18px;
+  margin: 8px 0;
+  color: var(--secondary);
+}
+.setup-guide a {
+  color: var(--mint);
+  text-decoration: none;
+}
+.wizard-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-size: 12px;
+}
+.wizard-fields label > small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 3px;
+}
+.transport-tabs button {
+  flex: 1;
+}
+.secret-add {
+  display: flex;
+  gap: 10px;
+}
+.secret-add > input {
+  min-width: 0;
+  flex: 1;
+}
+.vault-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.probe-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--muted);
+}
+.probe-result > div {
+  display: grid;
+  gap: 7px;
+}
+.probe-result strong {
+  font-weight: 500;
+  font-size: 13px;
+}
+.probe-result small {
+  font-size: 12px;
+}
+.probe-result.ready {
+  color: var(--mint);
+  border-color: #345743;
+  background: #192d22;
+}
+.tool-checklist {
+  max-height: 260px;
+  overflow: auto;
+}
+.tool-checklist label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tool-checklist input {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  accent-color: var(--mint);
+  flex: none;
+  margin-top: 3px;
+}
+.tool-checklist span {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.tool-checklist strong {
+  font-weight: 500;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.tool-checklist small {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.wizard-fields h3 {
+  font-size: 16px;
+  margin: 8px 0 0;
+}
+.wizard-footer {
+  position: sticky;
+  bottom: -24px;
+  background: #101319f7;
+  padding-bottom: 16px;
+  z-index: 2;
+  display: flex;
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.wizard-fields > label:not(.switch-label):has(> input) {
+  display: grid;
+  grid-template-columns: 145px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.wizard-fields > label:not(.switch-label):has(> input) > small {
+  grid-column: 2;
+}
+.wizard-footer button {
+  flex: 1;
+  font-size: 12px;
+}
+@media (max-width: 1300px) {
+  .mcp-workspace.with-wizard {
+    grid-template-columns: 1fr;
+  }
+  .mcp-wizard {
+    border: 0;
+    padding: 0;
+  }
+  .mcp-card {
+    padding: 16px;
+  }
+  .mcp-catalog {
+    max-width: 800px;
+  }
+}
