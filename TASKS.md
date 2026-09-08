@@ -72,6 +72,7 @@
   - [x] D14h. Frontend lifecycle dialog и reconnect для native startup; Tauri commands и visual native verification далее.
   - [x] D14i. Tauri shell, IPC ACL, tray, single instance, staging/build; standalone process и real OS vault smoke. Native visual/close-through-window gate остаётся открытым из-за недоступного Windows CU helper; capacity/workspace/settings и installer drain далее.
 - [ ] D15. Формы ролей и массового создания экземпляров.
+  - [x] D15g. Batch role assignment проверяет 1–5000 уникальных существующих неархивных ID, назначает атомарно с линейным lookup; queued/running tasks сохраняют pinned role/result после reopen, новые получают выбранную версию. UI назначения далее.
   - [x] D15f. Массовый выбор через каталог, сохранение вне фильтров, frozen batch preview с поиском/страницами/последствиями, fresh owner read и busy/stale/uncertain guards. Browser mutation/reload fixture + CU read-only preview рабочей области; CU исполнения новой batch API на обновлённой службе отдельно.
   - [x] D15e. Owner batch archive: один CAS/history/event для набора 1–5000 уникальных ID, all-or-nothing busy/unknown guard, очистка topology/личных bindings, сохранение памяти/файлов/истории. Registry Waiting/Stale не считается свободным; массовый выбор и preview реализованы в D15f.
   - [x] D15d. Переименование точного экземпляра через owner CAS: свежий read, stale/disconnect/uncertain guard, UTF-8 limit, сохранение identity/history; Chromium save/reload/Escape и CU настоящей службы с возвратом исходного имени.

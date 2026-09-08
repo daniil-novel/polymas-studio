@@ -268,12 +268,34 @@ impl Registry {
         Ok(ids)
     }
     pub fn pin_role(&mut self, agent_ids: &[String], role_id: &str, version: u32) -> Result<()> {
+        require(
+            !agent_ids.is_empty() && agent_ids.len() <= MAX_AGENTS,
+            "Выберите от 1 до 5000 экземпляров",
+        )?;
+        let unique: HashSet<_> = agent_ids.iter().collect();
+        require(unique.len() == agent_ids.len(), "Повторный ID экземпляра")?;
         self.role(role_id, version)?;
-        for id in agent_ids {
-            self.agent(id)?;
-        }
-        for id in agent_ids {
-            let a = self.agent_mut(id)?;
+        let indexed: HashMap<_, _> = self
+            .agents
+            .iter()
+            .enumerate()
+            .map(|(index, agent)| (agent.id.as_str(), index))
+            .collect();
+        let indices = agent_ids
+            .iter()
+            .map(|id| {
+                let index = *indexed
+                    .get(id.as_str())
+                    .ok_or_else(|| Error::NotFound("Агент не найден".into()))?;
+                require(
+                    self.agents[index].status != AgentStatus::Archived,
+                    "Архивному экземпляру нельзя назначить роль",
+                )?;
+                Ok(index)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        for index in indices {
+            let a = &mut self.agents[index];
             a.role_id = role_id.into();
             a.role_version = version;
         }
