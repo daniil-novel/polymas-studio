@@ -78,3 +78,102 @@ fn connection_drafts_cannot_forge_probe_results_or_enable_themselves() {
         json!("unconfigured")
     );
 }
+
+#[test]
+fn a_workspace_is_owned_by_one_service_and_agent_directory_aliases_are_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::open(dir.path()).unwrap();
+    assert!(Workspace::open(dir.path()).is_err());
+    let role = ws
+        .configure(
+            ws.config().revision,
+            ConfigCommand::CreateRole {
+                draft: RoleDraft {
+                    name: "A".into(),
+                    instruction: "Work".into(),
+                    ..Default::default()
+                },
+            },
+        )
+        .unwrap();
+    ws.configure(
+        ws.config().revision,
+        ConfigCommand::CreateAgents {
+            key: "two".into(),
+            request: BatchRequest {
+                role_id: role["id"].as_str().unwrap().into(),
+                role_version: 1,
+                count: 2,
+                name_pattern: "A{n}".into(),
+            },
+        },
+    )
+    .unwrap();
+    let ids: Vec<_> = ws
+        .config()
+        .value
+        .registry
+        .agents
+        .iter()
+        .map(|a| a.id.clone())
+        .collect();
+    let other = ws.agent_workspace(&ids[1]).unwrap();
+    let alias = ws.root.join("agents").join(&ids[0]);
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&other, &alias).unwrap();
+    #[cfg(windows)]
+    {
+        let result=std::process::Command::new("powershell.exe").args(["-NoProfile","-NonInteractive","-Command","New-Item -ItemType Junction -Path $env:POLYMAS_TEST_ALIAS -Target $env:POLYMAS_TEST_TARGET | Out-Null"]).env("POLYMAS_TEST_ALIAS",&alias).env("POLYMAS_TEST_TARGET",&other).output().unwrap();
+        assert!(result.status.success(), "fixture junction failed");
+    }
+    assert!(
+        ws.agent_workspace(&ids[0]).is_err(),
+        "An agent must not alias another agent workspace"
+    );
+}
+
+#[test]
+fn agent_parent_directory_cannot_be_redirected_outside_the_workspace() {
+    let dir = tempfile::tempdir().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::open(dir.path()).unwrap();
+    let role = ws
+        .configure(
+            ws.config().revision,
+            ConfigCommand::CreateRole {
+                draft: RoleDraft {
+                    name: "A".into(),
+                    instruction: "Work".into(),
+                    ..Default::default()
+                },
+            },
+        )
+        .unwrap();
+    ws.configure(
+        ws.config().revision,
+        ConfigCommand::CreateAgents {
+            key: "one".into(),
+            request: BatchRequest {
+                role_id: role["id"].as_str().unwrap().into(),
+                role_version: 1,
+                count: 1,
+                name_pattern: "A".into(),
+            },
+        },
+    )
+    .unwrap();
+    let agent = ws.config().value.registry.agents[0].id.clone();
+    let alias = ws.root.join("agents");
+    std::fs::remove_dir(&alias).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(other.path(), &alias).unwrap();
+    #[cfg(windows)]
+    {
+        let result=std::process::Command::new("powershell.exe").args(["-NoProfile","-NonInteractive","-Command","New-Item -ItemType Junction -Path $env:POLYMAS_TEST_ALIAS -Target $env:POLYMAS_TEST_TARGET | Out-Null"]).env("POLYMAS_TEST_ALIAS",&alias).env("POLYMAS_TEST_TARGET",other.path()).output().unwrap();
+        assert!(result.status.success(), "fixture junction failed");
+    }
+    assert!(
+        ws.agent_workspace(&agent).is_err(),
+        "Redirected parent must not allow a workspace outside the assigned root"
+    );
+}

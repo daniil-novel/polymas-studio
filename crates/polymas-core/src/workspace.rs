@@ -386,12 +386,19 @@ impl Workspace {
                 && uuid::Uuid::parse_str(&agent.id[6..]).is_ok(),
             "Некорректный workspace агента",
         )?;
-        let path = self.root.join("agents").join(&agent.workspace_key);
-        std::fs::create_dir_all(&path)?;
+        let parent = self.root.join("agents");
+        require(
+            parent.canonicalize()? == parent,
+            "Папка агентов не должна быть перенаправлена",
+        )?;
+        let path = parent.join(&agent.workspace_key);
+        if !path.exists() {
+            std::fs::create_dir(&path)?;
+        }
         let actual = path.canonicalize()?;
         require(
-            actual.starts_with(self.root.join("agents").canonicalize()?),
-            "Workspace агента выходит за разрешённую папку",
+            actual == path,
+            "Workspace агента не должен быть ссылкой на другую папку",
         )?;
         Ok(actual)
     }
