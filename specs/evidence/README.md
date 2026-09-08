@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D10n: RED отсутствовали WaitingUser/park_approval/wake_approval. GREEN девять scheduler tests, включая два новых: C=1 освобождается, approval wait сохраняется через SQLite/load и recovery, другое approval/message wake/старый epoch отклонены; новая попытка=2, cancel/first-accepted/budget не воскрешают ожидание. Пять engine tests и core/daemon clippy пройдены. Park вызывается только после reap, wake только после проверки исхода в приложении; эти application checks и gateway ещё не подключены.
+
 D10m: RED отсутствующие request_for_attempt/for_attempt. GREEN пять policy tests: повтор после reopen возвращает прежний ID/expiry без события, другой payload/key отклонён, lookup разделяет task/epoch, denied retry не становится pending, новая попытка требует нового решения. Два binding tests и core clippy пройдены. Receipt и approval создаются одной SQLite transaction. Исполняющий gateway ещё не подключён.
 
 D10l: RED Operation не содержал run/namespace/resource scope hash. GREEN четыре policy tests: смена каждой области отклонена, старый unscoped Approval десериализуется, но approval/consume не проходит, неверный namespace/hash отклонён; lifecycle events относятся к run. Прежние exact args/epoch/expiry/single-use и два binding tests сохранены; core clippy пройден. Это ledger contract, внешние записи через gateway ещё закрыты.

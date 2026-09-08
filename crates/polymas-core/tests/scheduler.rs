@@ -37,6 +37,111 @@ fn input() -> TaskInput {
         ..Default::default()
     }
 }
+#[test]
+fn waiting_for_owner_frees_capacity_and_only_the_matching_operation_can_resume() {
+    let (r, a) = setup(2, 1);
+    let mut s = Scheduler::default();
+    s.submit("approval", &r, &a, 1, input(), 1).unwrap();
+    let first = s.claim_ready(1, "local", 100).unwrap().remove(0);
+    let epoch = first.lease.unwrap().epoch;
+    s.park_approval(&first.id, epoch, "approval-1", "Waiting for owner".into())
+        .unwrap();
+    assert_eq!(s.task(&first.id).unwrap().state, TaskState::WaitingUser);
+    assert!(s.task(&first.id).unwrap().lease.is_none());
+    assert_eq!(
+        s.task(&first.id)
+            .unwrap()
+            .approval_wait
+            .as_ref()
+            .unwrap()
+            .origin_epoch,
+        epoch
+    );
+    assert!(s.verify_lease(&first.id, epoch).is_err());
+    assert!(s.accept(&first.id, true).is_err());
+    let mut db = polymas_core::storage::Store::memory().unwrap();
+    db.transaction(|tx| s.persist_delta(&Scheduler::default(), tx))
+        .unwrap();
+    let reloaded = Scheduler::load(&db).unwrap();
+    assert_eq!(
+        reloaded.task(&first.id).unwrap().approval_wait,
+        s.task(&first.id).unwrap().approval_wait
+    );
+    s.recover_after_crash();
+    assert_eq!(s.task(&first.id).unwrap().state, TaskState::WaitingUser);
+    assert!(
+        s.wake_approval(&first.id, "other-approval", "Forged decision".into())
+            .is_err()
+    );
+    assert!(
+        s.wake(&first.id, "A message cannot wake owner approval".into())
+            .is_err()
+    );
+    let second = s.claim_ready(1, "local", 101).unwrap().remove(0);
+    assert_ne!(second.assignee, first.assignee);
+    s.wake_approval(&first.id, "approval-1", "Operation completed".into())
+        .unwrap();
+    assert!(s.task(&first.id).unwrap().approval_wait.is_none());
+    s.finish(&second.id, second.lease.unwrap().epoch, Ok("done".into()))
+        .unwrap();
+    let resumed = s.claim_ready(1, "local", 102).unwrap().remove(0);
+    assert_eq!(resumed.id, first.id);
+    assert_eq!(resumed.attempt, 2);
+    assert!(resumed.lease.as_ref().unwrap().epoch > epoch);
+    assert!(s.finish(&first.id, epoch, Ok("stale".into())).is_err());
+    s.park_approval(
+        &first.id,
+        resumed.lease.unwrap().epoch,
+        "approval-2",
+        "Next approval".into(),
+    )
+    .unwrap();
+    s.cancel_task(&first.id).unwrap();
+    assert_eq!(s.task(&first.id).unwrap().state, TaskState::Cancelled);
+    assert!(s.task(&first.id).unwrap().approval_wait.is_none());
+    assert!(
+        s.wake_approval(&first.id, "approval-2", "Late owner response".into())
+            .is_err()
+    );
+}
+#[test]
+fn stopped_exhausted_and_first_accepted_runs_cannot_resurrect_an_owner_wait() {
+    let (r, a) = setup(2, 1);
+    let mut s = Scheduler::default();
+    let mut request = input();
+    request.completion = CompletionRule::FirstAccepted;
+    s.submit("approval", &r, &a, 1, request, 1).unwrap();
+    let first = s.claim_ready(1, "local", 100).unwrap().remove(0);
+    let epoch = first.lease.unwrap().epoch;
+    s.task_mut(&first.id).unwrap().role.draft.max_turns = 1;
+    assert!(
+        s.park_approval(&first.id, epoch, "approval-1", "No budget".into())
+            .is_err()
+    );
+    assert!(s.task(&first.id).unwrap().approval_wait.is_none());
+    assert!(s.verify_lease(&first.id, epoch).is_ok());
+    s.task_mut(&first.id).unwrap().role.draft.max_turns = 4;
+    s.park_approval(&first.id, epoch, "approval-1", "Waiting".into())
+        .unwrap();
+    let second = s.claim_ready(1, "local", 101).unwrap().remove(0);
+    s.finish(
+        &second.id,
+        second.lease.unwrap().epoch,
+        Ok("Accepted winner".into()),
+    )
+    .unwrap();
+    s.accept(&second.id, true).unwrap();
+    assert_eq!(s.task(&first.id).unwrap().state, TaskState::Cancelled);
+    assert!(s.task(&first.id).unwrap().approval_wait.is_none());
+    assert!(
+        s.wake_approval(&first.id, "approval-1", "Late".into())
+            .is_err()
+    );
+    assert!(
+        s.park_approval(&first.id, epoch, "approval-1", "Late".into())
+            .is_err()
+    );
+}
 
 #[test]
 fn one_thousand_ids_are_queued_but_only_ten_distinct_leases_are_claimed() {

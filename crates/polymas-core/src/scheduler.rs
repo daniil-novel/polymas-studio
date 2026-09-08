@@ -49,6 +49,7 @@ pub enum TaskState {
     Queued,
     Running,
     Waiting,
+    WaitingUser,
     Stopping,
     AwaitingAcceptance,
     Accepted,
@@ -90,6 +91,14 @@ pub struct Task {
     pub waiting: Option<WaitCondition>,
     #[serde(default)]
     pub resume_note: Option<String>,
+    #[serde(default)]
+    pub approval_wait: Option<ApprovalWait>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ApprovalWait {
+    pub approval_id: String,
+    pub origin_epoch: u64,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -316,6 +325,7 @@ impl Scheduler {
                     artifact_ids: vec![],
                     waiting: None,
                     resume_note: None,
+                    approval_wait: None,
                 })
             })
             .collect::<Result<_>>()?;
@@ -548,6 +558,68 @@ impl Scheduler {
         task.artifact_ids.clear();
         Ok(())
     }
+    /// Only after successful process reap; this state holds no model-process lease.
+    pub fn park_approval(
+        &mut self,
+        task_id: &str,
+        epoch: u64,
+        approval_id: &str,
+        summary: String,
+    ) -> Result<()> {
+        self.verify_lease(task_id, epoch)?;
+        require(
+            !approval_id.is_empty() && approval_id.len() <= 200 && summary.len() <= 65536,
+            "Некорректное ожидание решения",
+        )?;
+        let task = self.task_mut(task_id)?;
+        require(
+            task.state == TaskState::Running && task.attempt < task.role.draft.max_turns,
+            "Ожидание невозможно после остановки или исчерпания turn budget",
+        )?;
+        task.state = TaskState::WaitingUser;
+        task.approval_wait = Some(ApprovalWait {
+            approval_id: approval_id.into(),
+            origin_epoch: epoch,
+        });
+        task.waiting = None;
+        task.lease = None;
+        task.result = Some(summary);
+        task.error = None;
+        task.completed_at = None;
+        Ok(())
+    }
+    /// The application layer must verify the final operation outcome first.
+    /// Merely approving an unexecuted request is not a wake condition.
+    pub fn wake_approval(
+        &mut self,
+        task_id: &str,
+        approval_id: &str,
+        reason: String,
+    ) -> Result<()> {
+        require(
+            !reason.trim().is_empty() && reason.len() <= 1000,
+            "Нужна краткая причина продолжения",
+        )?;
+        let task = self.task_mut(task_id)?;
+        require(
+            task.state == TaskState::WaitingUser
+                && task
+                    .approval_wait
+                    .as_ref()
+                    .is_some_and(|wait| wait.approval_id == approval_id),
+            "Задача не ожидает эту операцию",
+        )?;
+        require(
+            task.attempt < task.role.draft.max_turns,
+            "Исчерпан turn budget роли",
+        )?;
+        task.state = TaskState::Queued;
+        task.approval_wait = None;
+        task.resume_note = Some(reason);
+        task.result = None;
+        task.artifact_ids.clear();
+        Ok(())
+    }
     pub fn accept(&mut self, task_id: &str, accept: bool) -> Result<()> {
         let task = self.task_mut(task_id)?;
         require(
@@ -578,9 +650,13 @@ impl Scheduler {
         };
         if run.accepted && matches!(run.input.completion, CompletionRule::FirstAccepted) {
             for t in self.tasks.iter_mut().filter(|t| t.run_id == run_id) {
-                if matches!(t.state, TaskState::Queued | TaskState::Waiting) {
+                if matches!(
+                    t.state,
+                    TaskState::Queued | TaskState::Waiting | TaskState::WaitingUser
+                ) {
                     t.state = TaskState::Cancelled;
                     t.waiting = None;
+                    t.approval_wait = None;
                 } else if t.state == TaskState::Running {
                     t.state = TaskState::Stopping;
                 }
@@ -607,9 +683,10 @@ impl Scheduler {
     pub fn cancel_task(&mut self, task_id: &str) -> Result<()> {
         let t = self.task_mut(task_id)?;
         match t.state {
-            TaskState::Queued | TaskState::Waiting => {
+            TaskState::Queued | TaskState::Waiting | TaskState::WaitingUser => {
                 t.state = TaskState::Cancelled;
                 t.waiting = None;
+                t.approval_wait = None;
                 t.completed_at = Some(now());
             }
             TaskState::Running => t.state = TaskState::Stopping,

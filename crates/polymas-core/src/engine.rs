@@ -192,6 +192,7 @@ impl Engine {
                             t.state,
                             TaskState::Queued
                                 | TaskState::Waiting
+                                | TaskState::WaitingUser
                                 | TaskState::Running
                                 | TaskState::Stopping
                                 | TaskState::Unknown
