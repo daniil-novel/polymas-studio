@@ -11,7 +11,7 @@ use polymas_core::{
     codex::RuntimeProbe,
     error::{Error, Result, require},
     history::{HistoryPage, RunQuery, RunSummary, RunTaskQuery, RunTaskSummary},
-    scheduler::TaskInput,
+    scheduler::{Task, TaskInput},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -141,9 +141,13 @@ async fn task(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> std::result::Result<Json<Value>, ApiError> {
-    Ok(Json(serde_json::to_value(
-        state.engine.lock().await.scheduler.task(&id)?,
-    )?))
+    let engine = state.engine.lock().await;
+    let saved = engine
+        .workspace
+        .db
+        .get::<Task>("tasks", &id)?
+        .ok_or_else(|| Error::NotFound("Задача не найдена".into()))?;
+    Ok(Json(serde_json::to_value(saved.value)?))
 }
 async fn runs(
     State(state): State<AppState>,

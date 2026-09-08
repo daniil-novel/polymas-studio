@@ -10,6 +10,93 @@ use tower::ServiceExt;
 
 const TOKEN: &str = "run-history-owner-fixture-token-32-characters";
 
+#[tokio::test]
+async fn old_result_remains_readable_when_task_is_not_in_the_scheduler_working_set() {
+    use polymas_core::{
+        registry::{BatchRequest, RoleDraft},
+        scheduler::TaskInput,
+        workspace::ConfigCommand,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let mut engine = Engine::open(dir.path()).unwrap();
+    let role = engine
+        .configure(
+            1,
+            ConfigCommand::CreateRole {
+                draft: RoleDraft {
+                    name: "History fixture".into(),
+                    instruction: "Read-only fixture".into(),
+                    ..Default::default()
+                },
+            },
+        )
+        .unwrap();
+    engine
+        .configure(
+            2,
+            ConfigCommand::CreateAgents {
+                key: "history-agent".into(),
+                request: BatchRequest {
+                    role_id: role["id"].as_str().unwrap().into(),
+                    role_version: 1,
+                    count: 1,
+                    name_pattern: "History {n}".into(),
+                },
+            },
+        )
+        .unwrap();
+    engine
+        .submit(
+            "old-result",
+            TaskInput {
+                prompt: "SAVED-PRIVATE-PROMPT".into(),
+                ..Default::default()
+            },
+            1,
+        )
+        .unwrap();
+    let task = engine.claim(1, "fixture-worker", 100).unwrap().remove(0);
+    engine
+        .finish(
+            &task.id,
+            task.lease.as_ref().unwrap().epoch,
+            Ok("SAVED-PRIVATE-RESULT 🧠".into()),
+        )
+        .unwrap();
+    engine.accept(&task.id).unwrap();
+    let expected = serde_json::to_value(engine.scheduler.task(&task.id).unwrap()).unwrap();
+    // Simulate eviction from the in-memory working set; the durable record remains intact.
+    engine.scheduler.tasks.clear();
+    let before = engine.workspace.db.last_sequence().unwrap();
+    let state = AppState::new(engine, TOKEN.into(), vec![]).unwrap();
+    let path = format!("/api/tasks/{}", task.id);
+    let (status, result) = get(&state, &path, TOKEN).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(result, expected);
+    assert_eq!(
+        get(&state, &path, "wrong-token").await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        get(&state, "/api/tasks/missing", TOKEN).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let (_, page) = get(&state, &format!("/api/runs/{}/tasks", task.run_id), TOKEN).await;
+    assert!(!page.to_string().contains("SAVED-PRIVATE"));
+    assert_eq!(page["items"][0]["id"], task.id);
+    assert_eq!(
+        state
+            .engine
+            .lock()
+            .await
+            .workspace
+            .db
+            .last_sequence()
+            .unwrap(),
+        before
+    );
+}
+
 fn setup() -> (tempfile::TempDir, AppState) {
     let dir = tempfile::tempdir().unwrap();
     let mut engine = Engine::open(dir.path()).unwrap();
