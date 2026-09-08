@@ -51,6 +51,7 @@
   - [x] D18h. Просмотр saved MCP response по частям и JSON export с SHA-256; отмена/смена карточки, corrupted reply и read retry. CU настоящего daemon fixture; Chromium download проверен, native save gate остаётся открытым.
 - [x] D11. Источники, утверждения, связи и происхождение знаний; UI/gateway следуют отдельно.
 - [ ] D12. Артефакты с hash, экспорт, backup и восстановление.
+  - [x] D12d. Настройки → подготовка/просмотр/скачивание конкретной ревизии, bounded Unicode preview, отмена/отказ/late response guards, проверка schema compiled standalone без unsafe-eval. Chromium download/CSP и CU 1280/736 authored 5000-instance stand; native save и импорт отдельно.
   - [x] D12c. Переносимый owner export конкретных экземпляров/версий/архитектуры: явная проекция, connection placeholders, JSON Schema и bounded complete file до 16 МиБ. Нет session/path/secret/history fields, чтение без мутаций; экран скачивания и импорт далее. [ADR-018](specs/adr/018-portable-configuration.md).
   - [x] D12a. Content-addressed артефакты, provenance и безопасный импорт.
   - [x] D12b. Backup/restore snapshot + blobs; переносимый экспорт конфигурации реализован отдельно в D12c.

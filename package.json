@@ -8,14 +8,16 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc -b && vite build",
-    "typecheck": "tsc -b",
+    "build": "npm run check:contracts && tsc -b && vite build",
+    "typecheck": "npm run check:contracts && tsc -b",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "format:check": "prettier --check apps/desktop/src tests/frontend",
     "desktop": "pwsh -NoProfile -File scripts/desktop.ps1",
-    "desktop:build": "pwsh -NoProfile -File scripts/desktop.ps1 -Build"
+    "desktop:build": "pwsh -NoProfile -File scripts/desktop.ps1 -Build",
+    "generate:contracts": "node scripts/generate-export-validator.mjs",
+    "check:contracts": "node scripts/generate-export-validator.mjs --check"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",
@@ -36,6 +38,8 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.1",
+    "ajv": "8.20.0",
+    "esbuild": "0.28.2",
     "eslint": "10.10.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "jsdom": "29.1.1",

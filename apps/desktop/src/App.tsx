@@ -37,6 +37,7 @@ import { McpWorkspace } from './McpWorkspace';
 import { KnowledgeWorkspace } from './knowledge/KnowledgeWorkspace';
 import { RecordingWorkspace } from './recording/RecordingWorkspace';
 import { ApprovalWorkspace } from './approvals/ApprovalWorkspace';
+import { ConfigurationExportPanel } from './ConfigurationExportPanel';
 import { stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
@@ -481,6 +482,12 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                       </div>
                       <span className="badge">Запланировано</span>
                     </div>
+                    <ConfigurationExportPanel
+                      key={snapshot.config.value.id}
+                      client={client}
+                      connected={connected}
+                      currentRevision={snapshot.config.revision}
+                    />
                   </>
                 )}
               </section>
