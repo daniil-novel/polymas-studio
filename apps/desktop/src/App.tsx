@@ -358,6 +358,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                           }
                           query={query}
                           scope={activeHolon?.members}
+                          scopeKey={activeHolon?.id}
                           groupLabels={Object.fromEntries([
                             ...snapshot.config.value.registry.roles.map((r) => [r.id, r.name]),
                             ...snapshot.config.value.architecture.holons.map((h) => [h.id, h.name]),

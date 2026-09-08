@@ -26,6 +26,8 @@ export class GraphRenderer {
   private version = 0;
   private layoutKey = '';
   private layoutPending = false;
+  private scopeKey: string | null = null;
+  private fitPending = false;
   private positions: Positions = {};
   private pinned: Positions = {};
   private canMove = false;
@@ -104,6 +106,7 @@ export class GraphRenderer {
       this.layoutPending = false;
       this.positions = event.data.positions;
       this.apply();
+      if (this.fitPending) this.fitVisible();
     };
     this.sigma.on('clickNode', ({ node }) => {
       if (performance.now() > this.suppressClickUntil) this.onSelect(node);
@@ -175,12 +178,18 @@ export class GraphRenderer {
     visible: Set<string>,
     groupLabels: Record<string, string>,
     canMove = false,
+    scopeKey: string | null = null,
   ) {
     const previous = this.projection;
     this.projection = projection;
     this.selected = selected;
     this.visible = visible;
     this.groupLabels = groupLabels;
+    if (this.scopeKey !== scopeKey) {
+      this.cancelDrag();
+      this.scopeKey = scopeKey;
+      this.fitPending = true;
+    }
     this.canMove = canMove && projection.frameTime === undefined;
     if (!this.canMove || (this.drag && !visible.has(this.drag.id))) this.cancelDrag();
     const key = JSON.stringify([projection.nodes.map((n) => [n.id, n.group]), pinned]);
@@ -197,7 +206,10 @@ export class GraphRenderer {
         nodes: projection.nodes,
         pinned: stablePositions(previous.nodes, projection.nodes, automatic, pinned),
       });
-    } else this.apply();
+    } else {
+      this.apply();
+      if (this.fitPending && !this.layoutPending) this.fitVisible();
+    }
   }
   private cancelDrag = () => {
     if (!this.drag) return;
@@ -461,10 +473,37 @@ export class GraphRenderer {
   };
   zoom(direction: number) {
     if (direction === 0) {
-      this.sigma.setCustomBBox(null);
-      void this.sigma.getCamera().animatedReset({ duration: this.reduced.matches ? 0 : 180 });
+      this.fitVisible();
     } else if (direction > 0) void this.sigma.getCamera().animatedZoom({ duration: 180 });
     else void this.sigma.getCamera().animatedUnzoom({ duration: 180 });
+  }
+  private fitVisible() {
+    if (this.layoutPending) {
+      this.fitPending = true;
+      return;
+    }
+    this.fitPending = false;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    for (const id of this.visible) {
+      const position = this.positions[id];
+      if (!position) continue;
+      minX = Math.min(minX, position[0]);
+      maxX = Math.max(maxX, position[0]);
+      minY = Math.min(minY, position[1]);
+      maxY = Math.max(maxY, position[1]);
+    }
+    this.sigma.setCustomBBox(
+      Number.isFinite(minX)
+        ? {
+            x: minX === maxX ? [minX - 1, maxX + 1] : [minX, maxX],
+            y: minY === maxY ? [minY - 1, maxY + 1] : [minY, maxY],
+          }
+        : null,
+    );
+    void this.sigma.getCamera().animatedReset({ duration: this.reduced.matches ? 0 : 180 });
   }
   focus(id: string) {
     const data = this.sigma.getNodeDisplayData(id);

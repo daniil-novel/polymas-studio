@@ -15,10 +15,21 @@ interface Props {
   onMove?: (id: string, position: [number, number]) => void;
   onUnpin?: (id: string) => void;
   scope?: Set<string>;
+  scopeKey?: string;
 }
 export function GraphView(props: Props) {
-  const { projection, pinned, selectedId, onSelect, query, groupLabels, onMove, onUnpin, scope } =
-    props;
+  const {
+    projection,
+    pinned,
+    selectedId,
+    onSelect,
+    query,
+    groupLabels,
+    onMove,
+    onUnpin,
+    scope,
+    scopeKey,
+  } = props;
   const [mode, setMode] = useState<'graph' | 'list'>('graph');
   const [failure, setFailure] = useState('');
   const [activeOnly, setActiveOnly] = useState(false);
@@ -75,6 +86,7 @@ export function GraphView(props: Props) {
           visibleRef.current,
           current.groupLabels,
           !!current.onMove,
+          current.scopeKey,
         );
       })
       .catch(() => {
@@ -87,8 +99,16 @@ export function GraphView(props: Props) {
     };
   }, [mode]);
   useEffect(() => {
-    renderer.current?.update(projection, pinned, selectedId, visible, groupLabels, !!onMove);
-  }, [projection, pinned, selectedId, visible, groupLabels, onMove]);
+    renderer.current?.update(
+      projection,
+      pinned,
+      selectedId,
+      visible,
+      groupLabels,
+      !!onMove,
+      scopeKey,
+    );
+  }, [projection, pinned, selectedId, visible, groupLabels, onMove, scopeKey]);
   const list = visibleNodes.filter((n) => n.kind === 'agent');
   const start = Math.min(Math.max(0, Math.floor(scrollTop / 54) - 4), Math.max(0, list.length - 1));
   return (
