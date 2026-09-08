@@ -8,7 +8,9 @@ use std::collections::BTreeSet;
 mod query;
 mod recovery;
 mod requests;
+mod result;
 pub use query::{ApprovalPage, ApprovalQuery};
+pub use result::{OperationResult, ResultMetadata, ResultPage, ResultQuery};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
@@ -306,7 +308,7 @@ impl ApprovalLedger {
     ) -> Result<Approval> {
         if let Some(value) = &result {
             require(
-                serde_json::to_vec(value)?.len() <= 4 * 1024 * 1024 + 8192,
+                serde_json::to_vec(value)?.len() <= result::MAX_OPERATION_RESULT_BYTES,
                 "Результат операции слишком велик",
             )?;
         }

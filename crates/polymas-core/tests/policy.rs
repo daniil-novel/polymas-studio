@@ -58,6 +58,9 @@ fn execution_result_and_outcome_commit_together_and_survive_reopen() {
     assert_eq!(db.last_sequence().unwrap(), head);
     drop(db);
     let db = Store::open(&path).unwrap();
+    let document = ApprovalLedger::result(&db, &first.id).unwrap().unwrap();
+    assert_eq!(document.inline().unwrap(), Some(result.clone()));
+    assert!(ApprovalLedger::result(&db, "missing").unwrap().is_none());
     assert_eq!(
         db.get::<serde_json::Value>("approval_results", &first.id)
             .unwrap()
