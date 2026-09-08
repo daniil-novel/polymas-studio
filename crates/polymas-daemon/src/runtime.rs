@@ -116,6 +116,25 @@ pub async fn drive_once(
     }
     Ok(handles)
 }
+pub fn bounded_inbox(
+    messages: Vec<polymas_core::messages::Message>,
+) -> Result<Vec<polymas_core::messages::Message>> {
+    let mut inbox = vec![];
+    let mut size = 2;
+    for message in messages {
+        let bytes = serde_json::to_vec(&message)?.len() + usize::from(!inbox.is_empty());
+        if size + bytes > 512 * 1024 {
+            require(
+                !inbox.is_empty(),
+                "Одно сообщение превышает допустимый размер входного batch",
+            )?;
+            break;
+        }
+        size += bytes;
+        inbox.push(message);
+    }
+    Ok(inbox)
+}
 async fn prepare(state: &AppState, task: &Task) -> Result<(CodexRequest, AttemptContext)> {
     let epoch = task
         .lease
@@ -136,22 +155,13 @@ async fn prepare(state: &AppState, task: &Task) -> Result<(CodexRequest, Attempt
     } else {
         runtime.session_id
     };
-    let mut inbox = vec![];
-    let mut size = 0;
-    for message in Router::pending_for_run(
+    let inbox = bounded_inbox(Router::pending_for_run(
         &engine.workspace.db,
         &task.run_id,
         &task.assignee,
         chrono::Utc::now().timestamp(),
         100,
-    )? {
-        let bytes = serde_json::to_vec(&message)?.len();
-        if size + bytes > 65536 {
-            break;
-        }
-        size += bytes;
-        inbox.push(message);
-    }
+    )?)?;
     let context = AttemptContext {
         id: format!("{}:{epoch}", task.id),
         task_id: task.id.clone(),

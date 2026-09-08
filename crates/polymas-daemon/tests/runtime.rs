@@ -180,6 +180,49 @@ async fn execution_injects_only_attempt_authority_and_revokes_it_after_process_c
     assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
     service.abort();
 }
+
+#[test]
+fn inbox_budget_accounts_for_json_escaping_without_starving_a_valid_full_size_message() {
+    use polymas_core::{
+        messages::{MessageInput, Router},
+        storage::Store,
+        topology::{Architecture, Edge},
+    };
+    let mut db = Store::memory().unwrap();
+    let architecture = Architecture {
+        edges: vec![Edge {
+            from: "a".into(),
+            to: "b".into(),
+        }],
+        ..Default::default()
+    };
+    for n in 0..3 {
+        Router::send(
+            &mut db,
+            &architecture,
+            "run",
+            "a",
+            &n.to_string(),
+            MessageInput {
+                recipient: "b".into(),
+                body: "\u{0001}".repeat(64 * 1024),
+                ..Default::default()
+            },
+            100,
+        )
+        .unwrap();
+    }
+    let pending = Router::pending_for_run(&db, "run", "b", 101, 100).unwrap();
+    let expected_id = pending[0].id.clone();
+    let batch = polymas_daemon::runtime::bounded_inbox(pending).unwrap();
+    assert_eq!(
+        batch.len(),
+        1,
+        "one valid 64 KiB message must fit even after JSON escaping"
+    );
+    assert_eq!(batch[0].id, expected_id);
+    assert!(serde_json::to_vec(&batch).unwrap().len() <= 512 * 1024);
+}
 #[tokio::test]
 async fn real_child_execution_updates_durable_pid_session_result_and_artifact() {
     let dir = tempfile::tempdir().unwrap();
