@@ -7,6 +7,11 @@ import { AgentNameEditor, type RefreshWorkspace } from './AgentNameEditor';
 import type { Command } from './RoleEditor';
 import { AgentArchiveDialog } from './AgentArchiveDialog';
 import { RoleAssignmentDialog } from './RoleAssignmentDialog';
+import {
+  InstanceColumnSettings,
+  useInstanceColumns,
+  type InstanceColumnId,
+} from './InstanceColumnSettings';
 
 interface Row {
   agent: Agent;
@@ -45,6 +50,7 @@ export function AgentDirectory({
   const [archived, setArchived] = useState(false);
   const [assigning, setAssigning] = useState<string[] | null>(null);
   const [assigned, setAssigned] = useState(false);
+  const columnSettings = useInstanceColumns(snapshot.config.value.id);
   const rows = useMemo(() => {
     const config = snapshot.config.value;
     const states = new Map(nodes.map((node) => [node.id, node.state]));
@@ -139,6 +145,7 @@ export function AgentDirectory({
           </select>
         </label>
       </div>
+      <InstanceColumnSettings {...columnSettings} />
       <div className="instance-bulk-actions">
         <span>
           Выбрано: {selection.size} · вне фильтра:{' '}
@@ -184,6 +191,7 @@ export function AgentDirectory({
       <InstanceRows
         key={JSON.stringify([roleId, query, state, order])}
         rows={rows}
+        columns={columnSettings.columns}
         selection={selection}
         onToggle={(id) => {
           setArchived(false);
@@ -269,11 +277,13 @@ export function AgentDirectory({
 
 function InstanceRows({
   rows,
+  columns,
   onRename,
   selection,
   onToggle,
 }: {
   rows: Row[];
+  columns: { id: InstanceColumnId; title: string; width: number }[];
   onRename?: (id: string) => void;
   selection: Set<string>;
   onToggle: (id: string) => void;
@@ -283,6 +293,7 @@ function InstanceRows({
   const [height, setHeight] = useState(540);
   const [copyError, setCopyError] = useState('');
   const [copied, setCopied] = useState('');
+  const visible = new Set(columns.map((column) => column.id));
   useEffect(() => {
     const element = viewport.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
@@ -312,7 +323,7 @@ function InstanceRows({
       await navigator.clipboard.writeText(agent.id);
       setCopied(`ID скопирован: ${agent.name}`);
     } catch {
-      setCopyError('Не удалось скопировать ID. Выделите его в строке таблицы.');
+      setCopyError(`Не удалось скопировать ID. ID экземпляра: ${agent.id}`);
     }
   }
   return (
@@ -333,27 +344,19 @@ function InstanceRows({
           className="instance-directory-table"
           aria-label="Экземпляры агентов"
           aria-rowcount={rows.length + 1}
+          aria-colcount={columns.length}
+          style={{ width: columns.reduce((total, column) => total + column.width, 0) }}
         >
           <colgroup>
-            {[45, 230, 220, 205, 180, 185, 200, 170, 55].map((width, i) => (
-              <col key={i} style={{ width }} />
+            {columns.map((column) => (
+              <col key={column.id} style={{ width: column.width }} />
             ))}
           </colgroup>
           <thead>
             <tr aria-rowindex={1}>
-              {[
-                'Выбор',
-                'Экземпляр',
-                'ID',
-                'Версия роли',
-                'Холон',
-                'Состояние',
-                'Задача',
-                'Исполнитель',
-                'ID',
-              ].map((name, i) => (
-                <th scope="col" key={i}>
-                  {name}
+              {columns.map((column) => (
+                <th scope="col" key={column.id}>
+                  {column.title}
                 </th>
               ))}
             </tr>
@@ -361,7 +364,7 @@ function InstanceRows({
           <tbody>
             {start > 0 && (
               <tr aria-hidden="true" className="instance-spacer">
-                <td colSpan={9} style={{ height: start * rowHeight }} />
+                <td colSpan={columns.length} style={{ height: start * rowHeight }} />
               </tr>
             )}
             {rows.slice(start, end).map((row, index) => (
@@ -391,19 +394,25 @@ function InstanceRows({
                     )}
                   </span>
                 </td>
-                <td title={row.agent.id}>
-                  <code>{row.agent.id}</code>
-                </td>
-                <td title={row.role}>{row.role}</td>
-                <td title={row.holon}>{row.holon}</td>
+                {visible.has('id') && (
+                  <td title={row.agent.id}>
+                    <code>{row.agent.id}</code>
+                  </td>
+                )}
+                {visible.has('role') && <td title={row.role}>{row.role}</td>}
+                {visible.has('holon') && <td title={row.holon}>{row.holon}</td>}
                 <td>{stateLabels[row.state] ?? row.state}</td>
-                <td title={row.task}>
-                  <code>{row.task}</code>
-                </td>
-                <td title={row.worker}>
-                  <span>{row.worker}</span>
-                  <small>{row.pid === null ? 'Codex CLI' : `Codex CLI · PID ${row.pid}`}</small>
-                </td>
+                {visible.has('task') && (
+                  <td title={row.task}>
+                    <code>{row.task}</code>
+                  </td>
+                )}
+                {visible.has('worker') && (
+                  <td title={row.worker}>
+                    <span>{row.worker}</span>
+                    <small>{row.pid === null ? 'Codex CLI' : `Codex CLI · PID ${row.pid}`}</small>
+                  </td>
+                )}
                 <td>
                   <button
                     className="icon-button"
@@ -417,7 +426,7 @@ function InstanceRows({
             ))}
             {end < rows.length && (
               <tr aria-hidden="true" className="instance-spacer">
-                <td colSpan={9} style={{ height: (rows.length - end) * rowHeight }} />
+                <td colSpan={columns.length} style={{ height: (rows.length - end) * rowHeight }} />
               </tr>
             )}
           </tbody>
@@ -437,7 +446,7 @@ function InstanceRows({
         </button>
       </nav>
       {copyError && (
-        <p role="alert" className="form-error">
+        <p role="alert" className="form-error instance-copy-error">
           {copyError}
         </p>
       )}

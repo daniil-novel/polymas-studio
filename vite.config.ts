@@ -10,6 +10,7 @@ export default defineConfig({
     root: '.',
     include: ['tests/frontend/**/*.test.{ts,tsx}'],
     environment: 'jsdom',
+    setupFiles: ['tests/frontend/setup-browser-storage.ts'],
     // Bound concurrent DOM environments on workstations running the desktop app as well.
     maxWorkers: 2,
   },

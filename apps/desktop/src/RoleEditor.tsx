@@ -504,6 +504,7 @@ export function RoleEditor({
         </>
       ) : (
         <AgentDirectory
+          key={snapshot.config.value.id}
           snapshot={snapshot}
           roleId={roleId}
           nodes={nodes}
