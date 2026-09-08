@@ -25,6 +25,10 @@ pub fn definitions() -> Value {
         .as_array_mut()
         .expect("static tools array")
         .extend(crate::gateway_messages::definitions());
+    value["tools"]
+        .as_array_mut()
+        .expect("static tools array")
+        .push(crate::gateway_wait::definition());
     value
 }
 pub async fn list() -> Json<Value> {
@@ -63,6 +67,11 @@ async fn dispatch(state: &AppState, scope: &Scope, input: ToolCall) -> Result<Va
         .try_acquire()
         .map_err(|_| Error::Capacity("Дождитесь завершения текущего вызова инструмента".into()))?;
     match input.name.as_str() {
+        "polymas_wait_for_message" => {
+            crate::gateway_wait::request(state, scope, serde_json::from_value(input.arguments)?)
+                .await
+                .map(success)
+        }
         "polymas_list_sources" => catalog(state, scope, serde_json::from_value(input.arguments)?)
             .await
             .map(success),

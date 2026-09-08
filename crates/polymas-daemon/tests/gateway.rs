@@ -205,6 +205,64 @@ async fn call(state: &AppState, token: &str, name: &str, arguments: Value) -> (S
     )
 }
 #[tokio::test]
+async fn wait_request_is_durable_idempotent_and_does_not_release_a_live_process() {
+    let (_dir, state, task_id) = setup().await;
+    let grant = issue(&state, &task_id).await.unwrap();
+    let args = json!({"timeoutSeconds":60,"summary":"Need peer evidence"});
+    let (_, first) = call(
+        &state,
+        grant.token.expose(),
+        "polymas_wait_for_message",
+        args.clone(),
+    )
+    .await;
+    assert_eq!(first["isError"], false, "{first}");
+    let (_, again) = call(
+        &state,
+        grant.token.expose(),
+        "polymas_wait_for_message",
+        args,
+    )
+    .await;
+    assert_eq!(
+        first, again,
+        "same attempt must retain its original deadline"
+    );
+    let (_, conflict) = call(
+        &state,
+        grant.token.expose(),
+        "polymas_wait_for_message",
+        json!({"timeoutSeconds":120,"summary":"Changed"}),
+    )
+    .await;
+    assert_eq!(conflict["isError"], true);
+    let engine = state.engine.lock().await;
+    let task = engine.scheduler.task(&task_id).unwrap();
+    assert_eq!(
+        task.state,
+        polymas_core::scheduler::TaskState::Running,
+        "only a reaped process may release its slot"
+    );
+    let key = format!("{}:{}", task.id, task.lease.as_ref().unwrap().epoch);
+    let saved = engine
+        .workspace
+        .db
+        .get::<Value>("wait_directives", &key)
+        .unwrap()
+        .unwrap()
+        .value;
+    assert_eq!(saved["input"]["summary"], "Need peer evidence");
+    drop(engine);
+    let (_, invalid) = call(
+        &state,
+        grant.token.expose(),
+        "polymas_wait_for_message",
+        json!({"sender":"foreign-agent","timeoutSeconds":60,"summary":"Wait"}),
+    )
+    .await;
+    assert_eq!(invalid["isError"], true);
+}
+#[tokio::test]
 async fn source_discovery_and_calls_apply_live_and_pinned_bindings_and_record_real_completion() {
     let (_dir, state, task_id) = setup().await;
     let grant = issue(&state, &task_id).await.unwrap();

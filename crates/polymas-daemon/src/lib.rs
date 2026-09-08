@@ -4,6 +4,7 @@ pub mod connection_api;
 pub mod gateway;
 pub mod gateway_messages;
 pub mod gateway_tools;
+pub mod gateway_wait;
 pub mod run_api;
 pub mod runtime;
 use axum::{

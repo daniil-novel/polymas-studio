@@ -22,6 +22,7 @@
   - [x] D10f. Runtime выдаёт отдельный gateway grant и отзывает его после попытки; actual Codex MCP smoke и write approvals далее.
   - [x] D10g. Peer discovery, send/inbox/ack через gateway; task delegation, wait/resume и write operation UI далее.
   - [x] D10h. Scheduler park/wake и turn budget; gateway yield и durable автоматическое пробуждение далее.
+  - [x] D10i. Durable gateway wait directive с проверкой срока/адресата/бюджета; runtime park после reap далее.
 - [x] D11. Источники, утверждения, связи и происхождение знаний; UI/gateway следуют отдельно.
 - [ ] D12. Артефакты с hash, экспорт, backup и восстановление.
   - [x] D12a. Content-addressed артефакты, provenance и безопасный импорт.
