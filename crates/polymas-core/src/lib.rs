@@ -6,6 +6,7 @@ pub mod codex;
 pub mod connections;
 pub mod engine;
 pub mod error;
+pub mod history;
 pub mod knowledge;
 pub mod mcp_client;
 pub mod messages;

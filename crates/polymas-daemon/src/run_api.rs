@@ -4,12 +4,13 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     routing::{get, post},
 };
 use polymas_core::{
     codex::RuntimeProbe,
     error::{Error, Result, require},
+    history::{HistoryPage, RunQuery, RunSummary, RunTaskQuery, RunTaskSummary},
     scheduler::TaskInput,
 };
 use serde::{Deserialize, Serialize};
@@ -28,7 +29,9 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/runtime", get(status))
         .route("/api/runtime/probe", post(probe))
-        .route("/api/runs", post(submit))
+        .route("/api/runs", post(submit).get(runs))
+        .route("/api/runs/{id}", get(run))
+        .route("/api/runs/{id}/tasks", get(run_tasks))
         .route("/api/tasks/{id}", get(task))
         .route("/api/tasks/{id}/action", post(task_action))
         .route("/api/runs/{id}/action", post(run_action))
@@ -141,6 +144,37 @@ async fn task(
     Ok(Json(serde_json::to_value(
         state.engine.lock().await.scheduler.task(&id)?,
     )?))
+}
+async fn runs(
+    State(state): State<AppState>,
+    Query(query): Query<RunQuery>,
+) -> std::result::Result<Json<HistoryPage<RunSummary>>, ApiError> {
+    Ok(Json(
+        state.engine.lock().await.workspace.db.run_page(&query)?,
+    ))
+}
+async fn run(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> std::result::Result<Json<RunSummary>, ApiError> {
+    Ok(Json(
+        state.engine.lock().await.workspace.db.run_summary(&id)?,
+    ))
+}
+async fn run_tasks(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(query): Query<RunTaskQuery>,
+) -> std::result::Result<Json<HistoryPage<RunTaskSummary>>, ApiError> {
+    Ok(Json(
+        state
+            .engine
+            .lock()
+            .await
+            .workspace
+            .db
+            .run_task_page(&id, &query)?,
+    ))
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

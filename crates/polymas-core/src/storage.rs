@@ -101,6 +101,9 @@ impl Store {
             CREATE INDEX IF NOT EXISTS events_run_sequence ON events(run_id,sequence);
             CREATE INDEX IF NOT EXISTS events_agent_sequence ON events(agent_id,sequence);
             CREATE INDEX IF NOT EXISTS approvals_state_page ON entities(json_extract(document,'$.state'),id) WHERE collection='approvals';
+            CREATE INDEX IF NOT EXISTS runs_history_page ON entities(json_extract(document,'$.createdAt') DESC,id DESC) WHERE collection='runs';
+            CREATE INDEX IF NOT EXISTS tasks_run_page ON entities(json_extract(document,'$.runId'),json_extract(document,'$.createdAt') DESC,id DESC) WHERE collection='tasks';
+            CREATE INDEX IF NOT EXISTS tasks_run_state_page ON entities(json_extract(document,'$.runId'),json_extract(document,'$.state'),json_extract(document,'$.createdAt') DESC,id DESC) WHERE collection='tasks';
             CREATE TABLE IF NOT EXISTS messages (
                 id TEXT PRIMARY KEY, run_id TEXT NOT NULL, sender TEXT NOT NULL, recipient TEXT NOT NULL,
                 idempotency_key TEXT NOT NULL, fingerprint TEXT NOT NULL, correlation_id TEXT NOT NULL,
