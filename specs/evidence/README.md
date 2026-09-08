@@ -1,5 +1,7 @@
 # Проверки реализации
 
+Runtime context: RED fixture prompt не содержал agentId; actual deadline failure доказал ошибку сокращённого имени. GREEN prompt содержит agentId/taskId/runId, не содержит capability token; три runtime и один wait runtime tests, clippy/build пройдены. После исправления тот же deadline prompt действительно вызвал gateway и перешёл waiting. CUA screenshot 1600×1000 подтвердил читаемую wait-панель, deadline, промежуточную сводку и отмену; счётчик процессов равен 0. Итог после deadline проверяется отдельно.
+
 D10k UI: RED ожидание отображалось как idle и итоговый результат без отмены/дальнейшего polling. GREEN 23 frontend tests, typecheck/lint/build; ожидающий узел не светится, после wake карточка обновляется. CUA проверил настоящий waiting через accessibility tree и итоговую карточку screenshot 1600×1000; изображение именно wait-панели ещё не захвачено. Browser console errors/warnings: 0. Полная Rust suite и clippy пройдены; opt-in vault test закономерно skipped.
 
 Actual Codex wait/message: run_7191fd56-0a32-4afc-be64-0093d753682e, task_ffd656ef-6350-415a-9d8c-28e73c9c8d17 PID 10232 → waiting → PID 22588, одна и та же sessionId. Второй task_99648c94-ce21-4c43-bb0e-be432b9c0978 PID 7772 с другой sessionId отправил SENT:POLYMAS-WAIT-64; первый вернул RESUMED:POLYMAS-WAIT-64. По одному wait_requested/woken/queued/delivered/ack. C=1; очередь кратко приостановлена для осмотра, затем продолжена. Оба результата приняты через UI. Все prompts/markers — собственные fixtures.

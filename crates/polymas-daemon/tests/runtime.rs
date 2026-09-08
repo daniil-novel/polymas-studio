@@ -97,6 +97,14 @@ impl Executor for GatewayExecutor {
                 .await
                 .unwrap();
             assert_eq!(response.status(), reqwest::StatusCode::OK);
+            let context: serde_json::Value = response.json().await.unwrap();
+            for field in ["agentId", "taskId", "runId"] {
+                assert!(
+                    request.prompt.contains(context[field].as_str().unwrap()),
+                    "the trusted attempt context must identify {field}"
+                );
+            }
+            assert!(!request.prompt.contains(&token));
             *token_out.lock().unwrap() = Some(token);
             FixtureExecutor.execute(request, sender, cancel).await
         })
