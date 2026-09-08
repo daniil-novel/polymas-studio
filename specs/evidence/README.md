@@ -1,5 +1,9 @@
 # Проверки реализации
 
+D14b: RED отсутствующий NativeConnection. GREEN localhost POST с auth, запрет внешнего URL/gateway/path traversal/fragment, отказ redirects и ответа >16 МиБ, сохранение 409 и удаление credential из диагностик. Два native transport tests и clippy. Tauri window/launcher ещё не реализованы.
+
+Actual deadline после context fix: task_4e4d9080-bd92-4b7e-8b84-4965bbfe0893, PID 23176 → waiting → PID 27112, одинаковая sessionId; одно task.woken в 04:34:43 UTC при deadline 04:34:43. Ответ DEADLINE-VERIFIED-28, attempt=2, accepted подтверждён API после приёмки через UI. Скриншот реальной wait-панели проверен перед пробуждением. Первое неуспешное испытание сохранено как rejected/stopped, не засчитано.
+
 Runtime context: RED fixture prompt не содержал agentId; actual deadline failure доказал ошибку сокращённого имени. GREEN prompt содержит agentId/taskId/runId, не содержит capability token; три runtime и один wait runtime tests, clippy/build пройдены. После исправления тот же deadline prompt действительно вызвал gateway и перешёл waiting. CUA screenshot 1600×1000 подтвердил читаемую wait-панель, deadline, промежуточную сводку и отмену; счётчик процессов равен 0. Итог после deadline проверяется отдельно.
 
 D10k UI: RED ожидание отображалось как idle и итоговый результат без отмены/дальнейшего polling. GREEN 23 frontend tests, typecheck/lint/build; ожидающий узел не светится, после wake карточка обновляется. CUA проверил настоящий waiting через accessibility tree и итоговую карточку screenshot 1600×1000; изображение именно wait-панели ещё не захвачено. Browser console errors/warnings: 0. Полная Rust suite и clippy пройдены; opt-in vault test закономерно skipped.
