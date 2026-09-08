@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D14f: RED отсутствующий NativeProfile. GREEN настоящий daemon сохраняет профиль, после drop повторное подключение возвращает тот же PID и workspace без второго credential; содержимое файлов профиля проверено на отсутствие credential bytes. Пять native_host tests и clippy пройдены. Vault в regression — in-memory fixture, проверка системного хранилища и окна ещё впереди. При ошибке удаления старой записи она остаётся в durable очереди очистки.
+
 D14e: RED отсутствующий adoption gate/CLI timeout; дополнительный RED expiry отменял старую queued задачу. GREEN неподтверждённый запуск не исполняет очередь, живой daemon объявляет порт и через 2 секунды закрывается, исходная queued задача остаётся queued, поздний adopt после expired отклонён. Четыре native_host, три runtime, четыре HTTP tests и clippy. Desktop должен сохранить vault reference + endpoint перед adopt; Tauri ещё не подключён.
 
 D14d: RED отсутствующие CredentialVault/ServiceRecord. GREEN serialize/deserialize сохраняет reconnect после drop host, JSON не содержит credential, неверный workspaceId и отсутствующий vault credential отклонены. Три native_host tests с настоящим daemon и in-memory vault, clippy пройдены. Реальный OS vault в этом сценарии не подменяется утверждением о проверке: он будет проверен при запуске нативной оболочки.

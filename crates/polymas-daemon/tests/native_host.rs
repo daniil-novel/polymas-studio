@@ -85,6 +85,10 @@ async fn service_startup_expires_without_a_durable_desktop_adoption() {
 #[derive(Default)]
 struct MemoryVault(std::sync::Mutex<std::collections::BTreeMap<String, String>>);
 impl polymas_desktop_host::service::CredentialVault for MemoryVault {
+    fn remove(&self, key: &str) -> polymas_core::error::Result<()> {
+        self.0.lock().unwrap().remove(key);
+        Ok(())
+    }
     fn save(&self, secret: &polymas_core::secrets::Secret) -> polymas_core::error::Result<String> {
         let key = uuid::Uuid::new_v4().to_string();
         self.0
@@ -102,6 +106,52 @@ impl polymas_desktop_host::service::CredentialVault for MemoryVault {
                 .ok_or_else(|| polymas_core::error::Error::Denied("No credential".into()))?
                 .clone(),
         )
+    }
+}
+#[tokio::test]
+async fn durable_profile_reuses_the_same_daemon_and_keeps_credentials_in_the_vault() {
+    use polymas_desktop_host::profile::NativeProfile;
+    let dir = tempfile::tempdir().unwrap();
+    let profile = dir.path().join("profile");
+    let workspace = dir.path().join("workspace");
+    let executable = std::path::Path::new(env!("CARGO_BIN_EXE_polymas-daemon"));
+    let vault = MemoryVault::default();
+    let first = NativeProfile::connect(&profile, &workspace, executable, 1, &vault)
+        .await
+        .unwrap();
+    let pid = first.record.pid;
+    assert!(!first.reused);
+    drop(first);
+    let second = NativeProfile::connect(&profile, &workspace, executable, 1, &vault)
+        .await
+        .unwrap();
+    let reused = second.reused;
+    let second_pid = second.record.pid;
+    let state = second.connection.request("/api/state", None).await.unwrap();
+    second
+        .connection
+        .request("/api/control", Some(json!({"action":"shutdown"})))
+        .await
+        .unwrap();
+    let secrets: Vec<_> = vault.0.lock().unwrap().values().cloned().collect();
+    drop(second);
+    assert!(reused);
+    assert_eq!(pid, second_pid);
+    assert_eq!(
+        secrets.len(),
+        1,
+        "reconnect must not create a new credential"
+    );
+    assert_eq!(state["config"]["revision"], 1);
+    for file in std::fs::read_dir(&profile)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().is_file())
+    {
+        let bytes = std::fs::read(file.path()).unwrap();
+        for secret in &secrets {
+            assert!(!bytes.windows(secret.len()).any(|w| w == secret.as_bytes()));
+        }
     }
 }
 #[tokio::test]

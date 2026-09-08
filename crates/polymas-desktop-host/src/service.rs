@@ -22,6 +22,7 @@ struct Ready {
 pub trait CredentialVault: Send + Sync {
     fn save(&self, secret: &Secret) -> Result<String>;
     fn load(&self, reference: &str) -> Result<Secret>;
+    fn remove(&self, reference: &str) -> Result<()>;
 }
 impl CredentialVault for polymas_core::secrets::OsVault {
     fn save(&self, secret: &Secret) -> Result<String> {
@@ -29,6 +30,9 @@ impl CredentialVault for polymas_core::secrets::OsVault {
     }
     fn load(&self, reference: &str) -> Result<Secret> {
         self.load(reference)
+    }
+    fn remove(&self, reference: &str) -> Result<()> {
+        self.remove(reference)
     }
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
