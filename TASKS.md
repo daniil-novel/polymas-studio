@@ -13,6 +13,7 @@
 - [x] D07. Codex resolver, JSONL, отдельный процесс, явный resume и отмена.
   - [x] D07a. Неизменяемый владелец всех прошлых сессий, migration и runtime enforcement; отвергнутое событие не освобождает экземпляр до reap.
   - [ ] D07b. Квалифицировать отдельный интерактивный Codex adapter для MCP write approvals: точное решение по thread/turn/item/args, deny для остальных действий, без blanket approval. Exec 0.144.1 отменил destructive MCP call после owner decision; реальная запись пока не прошла gate.
+    - Предварительная проверка 0.144.1 и остающиеся условия: [app-server qualification](specs/evidence/codex-app-server-01441.md).
 - [x] D08. Надёжная маршрутизация сообщений и защита от циклов; gateway связывается в D10.
 - [x] D09. MCP-рецепты, stdio/HTTP, диагностика и секретное хранилище; расширенные integration tests в D22.
 - [ ] D10. Gateway: bindings, ограничения инструментов и approvals.
