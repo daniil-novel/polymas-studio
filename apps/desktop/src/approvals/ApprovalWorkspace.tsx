@@ -27,6 +27,7 @@ export function ApprovalWorkspace({
   const [cursors, setCursors] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [poll, setPoll] = useState(0);
   const [busy, setBusy] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, ReconciliationDraft>>({});
   const inFlight = useRef(false);
@@ -41,6 +42,7 @@ export function ApprovalWorkspace({
     client,
     `/api/approvals?limit=30${filter ? `&state=${filter}` : ''}${cursors.length ? `&after=${encodeURIComponent(cursors.at(-1)!)}` : ''}`,
     refresh,
+    poll,
   );
   const currentId = selected ?? page.data?.items[0]?.id ?? null;
   const draft = currentId ? (drafts[currentId] ?? emptyDraft) : emptyDraft;
@@ -48,7 +50,7 @@ export function ApprovalWorkspace({
   useEffect(() => {
     if (busy || !connected || editing) return;
     const timer = setInterval(() => {
-      if (document.visibilityState !== 'hidden') setRefresh((n) => n + 1);
+      if (document.visibilityState !== 'hidden') setPoll((n) => n + 1);
     }, 5000);
     return () => clearInterval(timer);
   }, [busy, connected, editing]);
@@ -170,7 +172,7 @@ export function ApprovalWorkspace({
               {page.error}
             </p>
           )}
-          {page.loading && <p className="muted">Загрузка операций…</p>}
+          {page.loading && !page.data && <p className="muted">Загрузка операций…</p>}
           {page.data?.items.length === 0 && (
             <div className="approval-empty">
               <ShieldCheck size={30} />
@@ -228,6 +230,7 @@ export function ApprovalWorkspace({
             client={client}
             snapshot={snapshot}
             refresh={refresh}
+            poll={poll}
             busy={busy}
             connected={connected}
             clock={clock}
@@ -253,6 +256,7 @@ function ApprovalCard({
   client,
   snapshot,
   refresh,
+  poll,
   busy,
   connected,
   clock,
@@ -265,6 +269,7 @@ function ApprovalCard({
   client: ApiClient;
   snapshot: Snapshot;
   refresh: number;
+  poll: number;
   busy: boolean;
   connected: boolean;
   clock: number;
@@ -277,6 +282,7 @@ function ApprovalCard({
     client,
     `/api/approvals/${encodeURIComponent(id)}`,
     refresh,
+    poll,
   );
   const detail = remote.data;
   if (!detail)
@@ -296,6 +302,7 @@ function ApprovalCard({
   const transport = detail.connection?.transport;
   const agent = snapshot.config.value.registry.agents.find((a) => a.id === op.agentId);
   const run = snapshot.runs.find((r) => r.id === op.runId);
+  const unavailable = busy || !connected || remote.loading || Boolean(remote.error);
   return (
     <section className="approval-card" aria-label="Точная операция">
       <header>
@@ -345,6 +352,11 @@ function ApprovalCard({
         Разрешение относится к одной показанной операции. Во время ожидания агент освобождает слот
         исполнителя.
       </p>
+      {remote.error && (
+        <p className="form-error" role="alert">
+          {remote.error}
+        </p>
+      )}
       {value.state === 'pending' && detail.unavailableReason && (
         <p className="form-error">{detail.unavailableReason}</p>
       )}
@@ -356,14 +368,14 @@ function ApprovalCard({
       {value.state === 'pending' && (
         <div className="approval-actions">
           <button
-            disabled={busy || !connected || !detail.canDeny || expired}
+            disabled={unavailable || !detail.canDeny || expired}
             onClick={() => void onDecision(detail, false)}
           >
             <X size={16} /> Отклонить операцию
           </button>
           <button
             className="primary"
-            disabled={busy || !connected || !detail.canApprove || expired}
+            disabled={unavailable || !detail.canApprove || expired}
             onClick={() => void onDecision(detail, true)}
           >
             <Check size={16} /> Разрешить эту операцию
@@ -373,7 +385,7 @@ function ApprovalCard({
       {value.state === 'unknown' && (
         <ReconciliationForm
           draft={draft}
-          disabled={busy || !connected}
+          disabled={unavailable}
           onChange={onDraft}
           onSubmit={() => void onReconcile(detail, draft)}
         />

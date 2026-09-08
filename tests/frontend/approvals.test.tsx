@@ -1,10 +1,58 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApprovalWorkspace } from '../../apps/desktop/src/approvals/ApprovalWorkspace';
 import { ApiClient, ApiError } from '../../apps/desktop/src/api';
 import type { Snapshot } from '../../apps/desktop/src/types';
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+test('background refresh preserves the inspected card and disables decisions until fresh data arrives', async () => {
+  const interval = vi.spyOn(globalThis, 'setInterval');
+  const { client, request } = setup();
+  const original = request.getMockImplementation()!;
+  render(<ApprovalWorkspace client={client} snapshot={snapshot} connected />);
+  await screen.findByText(/Точный текст one/);
+  const card = screen.getByRole('region', { name: 'Точная операция' });
+  const identifiers = card.querySelector('details')!;
+  identifiers.open = true;
+  card.scrollTop = 180;
+  const responses: ((value: unknown) => void)[] = [];
+  request.mockImplementation((path, body, signal) => {
+    if (!body) return new Promise((resolve) => responses.push(resolve));
+    return original(path, body, signal);
+  });
+  const poll = interval.mock.calls.find(([, delay]) => delay === 5000)![0] as () => void;
+  act(() => poll());
+  expect(screen.getByRole('region', { name: 'Точная операция' })).toBe(card);
+  expect(identifiers.open).toBe(true);
+  expect(card.scrollTop).toBe(180);
+  expect(screen.getByRole('button', { name: 'Разрешить эту операцию' })).toHaveProperty(
+    'disabled',
+    true,
+  );
+  await act(async () => {
+    // The page and the exact detail refresh independently.
+    for (const resolve of responses)
+      resolve({ ...detail('one'), items: [{ id: 'one', state: 'pending' }], nextCursor: null });
+  });
+  expect(screen.getByRole('region', { name: 'Точная операция' })).toBe(card);
+  expect(identifiers.open).toBe(true);
+  expect(screen.getByRole('button', { name: 'Разрешить эту операцию' })).toHaveProperty(
+    'disabled',
+    false,
+  );
+  request.mockRejectedValue(new Error('Не удалось проверить актуальность'));
+  await act(async () => poll());
+  expect(screen.getByRole('region', { name: 'Точная операция' })).toBe(card);
+  expect(screen.getAllByText('Не удалось проверить актуальность').length).toBeGreaterThan(0);
+  expect(screen.getByRole('button', { name: 'Разрешить эту операцию' })).toHaveProperty(
+    'disabled',
+    true,
+  );
+  expect(request.mock.calls.filter(([, body]) => body)).toHaveLength(0);
+});
 test('manual outcome reconciliation preserves the note across refresh and submits no execution command', async () => {
   const { client, request } = setup();
   const original = request.getMockImplementation()!;

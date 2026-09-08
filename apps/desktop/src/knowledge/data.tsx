@@ -1,27 +1,51 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ApiClient } from '../api';
 import type { Page } from './model';
-export function useRemote<T>(client: ApiClient, path: string, refresh: number) {
-  const [state, setState] = useState<{ path: string; refresh: number; data?: T; error?: string }>();
+export function useRemote<T>(
+  client: ApiClient,
+  path: string,
+  refresh: number,
+  backgroundRefresh = 0,
+) {
+  const [state, setState] = useState<{
+    client: ApiClient;
+    path: string;
+    refresh: number;
+    backgroundRefresh: number;
+    data?: T;
+    error?: string;
+  }>();
   useEffect(() => {
     const abort = new AbortController();
     client
       .request<T>(path, undefined, abort.signal)
       .then((data) => {
-        if (!abort.signal.aborted) setState({ path, refresh, data });
+        if (!abort.signal.aborted) setState({ client, path, refresh, backgroundRefresh, data });
       })
       .catch((error: unknown) => {
         if (!abort.signal.aborted)
-          setState({
+          setState((previous) => ({
+            client,
             path,
             refresh,
+            backgroundRefresh,
+            data:
+              previous?.client === client && previous.path === path && previous.refresh === refresh
+                ? previous.data
+                : undefined,
             error: error instanceof Error ? error.message : 'Не удалось загрузить знания',
-          });
+          }));
       });
     return () => abort.abort();
-  }, [client, path, refresh]);
-  const current = state?.path === path && state.refresh === refresh ? state : null;
-  return { data: current?.data, error: current?.error, loading: !current };
+  }, [client, path, refresh, backgroundRefresh]);
+  // Explicit refresh/path/client changes invalidate review; polling preserves its DOM only.
+  const current =
+    state?.client === client && state.path === path && state.refresh === refresh ? state : null;
+  return {
+    data: current?.data,
+    error: current?.error,
+    loading: !current || current.backgroundRefresh !== backgroundRefresh,
+  };
 }
 export function usePage<T>(client: ApiClient, base: string, refresh: number) {
   const [navigation, setNavigation] = useState<{ base: string; cursors: string[] }>({
