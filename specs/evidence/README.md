@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D10c: RED отсутствующий gateway module. GREEN: scoped context, запрет control token/Origin, запрет обратного доступа к admin API, отзыв при Drop и завершении task, отсутствие credential в durable events. Два regression tests и clippy. Это авторизация transport, MCP forwarding подключается следующим срезом.
+
 D17 acceptance consistency: RED показал accepted task при Artifact.accepted=false. GREEN: задача и артефакт принимаются одной транзакцией; отсутствующий второй artifact откатывает первую запись и event cursor. Полная проверка Rust/UI/spec пройдена до коммита. Исторические workspace с прежним несогласованным флагом требуют отдельной миграции, тест проверяет новые операции.
 
 D18b: RED McpWizard import; дополнительный RED обнаружил, что helper text менял accessible label папки; label исправлен. GREEN failed probe оставляет Enable недоступным, toggle не отправляется, 21 UI test + TS/lint/build. Computer use на реальном daemon: специально созданная `tmp/demo-knowledge` проверена, обнаружены read_text/list_files, role binding «Исследователь» сохранён, переключатель ON и 1 привязка. Визуальная сверка 1600×1000 с reference 03: каталог слева, мастер справа, шаги/инструкция, credential fields/read-only, footer виден; Neo4j не подключён без endpoint/credentials. Browser error/warn log пуст. Инструкция сверена с [Neo4j quickstart](https://neo4j.com/docs/mcp/current/quickstart/) и [configuration](https://neo4j.com/docs/mcp/current/configuration/) 2026-09-08. Реальный вызов через агентский gateway следует отдельно.

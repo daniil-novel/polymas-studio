@@ -1,5 +1,6 @@
 //! Local authenticated control plane. The desktop and worker bridge use separate credentials.
 pub mod connection_api;
+pub mod gateway;
 pub mod run_api;
 pub mod runtime;
 use axum::{
@@ -29,6 +30,7 @@ pub struct AppState {
     pub runtime_options: Arc<tokio::sync::RwLock<Option<runtime::RuntimeOptions>>>,
     pub runtime_status: Arc<tokio::sync::RwLock<run_api::RuntimeStatus>>,
     pub shutdown: Arc<tokio::sync::Notify>,
+    pub gateway_scopes: gateway::Scopes,
     token: Arc<Secret>,
     allowed_origins: Arc<BTreeSet<String>>,
 }
@@ -44,6 +46,7 @@ impl AppState {
             runtime_options: Arc::new(tokio::sync::RwLock::new(None)),
             runtime_status: Arc::new(tokio::sync::RwLock::new(Default::default())),
             shutdown: Arc::new(tokio::sync::Notify::new()),
+            gateway_scopes: Default::default(),
             token: Arc::new(Secret::new(token)?),
             allowed_origins: Arc::new(allowed_origins.into_iter().collect()),
         })
@@ -87,6 +90,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/history", get(history))
         .layer(DefaultBodyLimit::max(1024 * 1024))
         .route_layer(middleware::from_fn_with_state(state.clone(), authorize))
+        .merge(gateway::routes(state.clone()))
         .with_state(state)
 }
 async fn authorize(State(state): State<AppState>, request: Request, next: Next) -> Response {

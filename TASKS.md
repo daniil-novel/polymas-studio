@@ -16,6 +16,7 @@
 - [ ] D10. Gateway: bindings, ограничения инструментов и approvals.
   - [x] D10a. Durable exact-operation approvals; привязка к gateway следует отдельно.
   - [x] D10b. Role/agent bindings, tool allowlist и пересечение namespaces.
+  - [x] D10c. Отдельная авторизация gateway и отзыв attempt credentials; forwarding и подключение Codex следуют отдельно.
 - [x] D11. Источники, утверждения, связи и происхождение знаний; UI/gateway следуют отдельно.
 - [ ] D12. Артефакты с hash, экспорт, backup и восстановление.
   - [x] D12a. Content-addressed артефакты, provenance и безопасный импорт.
