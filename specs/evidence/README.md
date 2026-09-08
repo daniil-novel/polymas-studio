@@ -38,6 +38,8 @@
 
 ### D15 visual follow-up
 
+D15b: RED ArchitectureEditor import; GREEN независимая память без coordinator, CAS revision, C>N/stale draft blocked, 14 UI tests + TS/lint/build. Computer use: созданы и сохранены 3 холона с 6/4/2 участниками и собственными координаторами, ревизия 4, N=12/C=1. Визуально найдена отдельная проблема сохранения автоматических координат после перегруппировки; исправляется следующим срезом.
+
 D16 follow-up: при сверке с `Architecture::permits_message` обнаружено расхождение. RED independent показывал запрещённое ребро; GREEN independent/single не показывают каналы, optional coordinator в network показывает два направления. 5 graph regression tests.
 
 D16b: RED GraphView import; GREEN поиск точного ID среди 5000 определений в DOM-списке без WebGL. TS/lint/11 tests/build. Computer use на реальном приложении: N=12, running=0, WebGL работает, миникарта видна, поиск «Исследователь · 07» показывает одну строку, выбор открывает соответствующий ID в инспекторе; browser error/warn log пуст. Форма архитектуры и взаимодействие с реальным MCP ещё не покрыты этим наблюдением.

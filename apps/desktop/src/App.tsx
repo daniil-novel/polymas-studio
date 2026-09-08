@@ -23,6 +23,8 @@ import {
 import { ApiClient, createClient } from './api';
 import { useWorkspace } from './useWorkspace';
 import { RoleEditor } from './RoleEditor';
+import { ArchitectureEditor } from './ArchitectureEditor';
+import { Modal } from './Modal';
 import { agentState, stateLabels } from './types';
 import { GraphView } from './graph/GraphView';
 import { projectGraph } from './graph/model';
@@ -38,6 +40,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState('');
+  const [architectureOpen, setArchitectureOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -225,6 +228,12 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                 <kbd>⌕</kbd>
               </div>
               <span className="version-chip">v{snapshot.config.revision}</span>
+              {page === 'graph' && (
+                <button onClick={() => setArchitectureOpen(true)}>
+                  <Settings2 size={16} />
+                  Архитектура
+                </button>
+              )}
             </div>
             <div className={`content-row ${page === 'graph' ? 'graph-layout' : ''}`}>
               <section className={page === 'graph' ? 'graph-stage' : 'page-content'}>
@@ -458,6 +467,23 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
           </>
         )}
       </main>
+      {snapshot && architectureOpen && (
+        <Modal
+          label="Архитектура системы"
+          onClose={() => {
+            if (
+              window.confirm('Закрыть форму архитектуры? Несохранённые изменения будут потеряны.')
+            )
+              setArchitectureOpen(false);
+          }}
+        >
+          <ArchitectureEditor
+            snapshot={snapshot}
+            command={data.command}
+            onClose={() => setArchitectureOpen(false)}
+          />
+        </Modal>
+      )}
     </div>
   );
 }
