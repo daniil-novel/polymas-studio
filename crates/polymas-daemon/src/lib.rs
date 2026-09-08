@@ -1,4 +1,5 @@
 //! Local authenticated control plane. The desktop and worker bridge use separate credentials.
+pub mod run_api;
 pub mod runtime;
 use axum::{
     Json, Router,
@@ -24,6 +25,9 @@ use tokio::sync::Mutex;
 pub struct AppState {
     pub engine: Arc<Mutex<Engine>>,
     pub active: Arc<Mutex<std::collections::BTreeMap<String, tokio::sync::watch::Sender<bool>>>>,
+    pub runtime_options: Arc<tokio::sync::RwLock<Option<runtime::RuntimeOptions>>>,
+    pub runtime_status: Arc<tokio::sync::RwLock<run_api::RuntimeStatus>>,
+    pub shutdown: Arc<tokio::sync::Notify>,
     token: Arc<Secret>,
     allowed_origins: Arc<BTreeSet<String>>,
 }
@@ -36,6 +40,9 @@ impl AppState {
         Ok(Self {
             engine: Arc::new(Mutex::new(engine)),
             active: Arc::new(Mutex::new(Default::default())),
+            runtime_options: Arc::new(tokio::sync::RwLock::new(None)),
+            runtime_status: Arc::new(tokio::sync::RwLock::new(Default::default())),
+            shutdown: Arc::new(tokio::sync::Notify::new()),
             token: Arc::new(Secret::new(token)?),
             allowed_origins: Arc::new(allowed_origins.into_iter().collect()),
         })
@@ -71,6 +78,7 @@ impl IntoResponse for ApiError {
 }
 pub fn router(state: AppState) -> Router {
     Router::new()
+        .merge(run_api::routes())
         .route("/api/state", get(snapshot))
         .route("/api/configure", post(configure))
         .route("/api/events", get(events))
@@ -110,6 +118,13 @@ async fn snapshot(State(state): State<AppState>) -> std::result::Result<Json<Val
     let engine = state.engine.lock().await;
     let mut value = serde_json::to_value(engine.workspace.snapshot()?)?;
     value["paused"] = json!(engine.scheduler.paused);
+    value["runtime"] = serde_json::to_value(state.runtime_status.read().await.clone())?;
+    value["agentRuntime"] = serde_json::to_value(
+        engine
+            .workspace
+            .db
+            .list::<runtime::AgentRuntime>("agent_runtime", 5000)?,
+    )?;
     value["runs"]=json!(engine.scheduler.runs.iter().rev().take(100).map(|r| json!({"id":r.id,"title":r.title,"createdAt":r.created_at,"accepted":r.accepted,"stopped":r.stopped,"taskIds":r.task_ids,"configRevision":r.config_revision})).collect::<Vec<_>>());
     value["taskCount"] = json!(engine.scheduler.tasks.len());
     value["tasks"]=json!(engine.scheduler.tasks.iter().rev().take(1000).map(|t| json!({"id":t.id,"runId":t.run_id,"assignee":t.assignee,"state":t.state,"attempt":t.attempt,"lease":t.lease,"createdAt":t.created_at,"completedAt":t.completed_at,"artifactIds":t.artifact_ids,"error":t.error})).collect::<Vec<_>>());

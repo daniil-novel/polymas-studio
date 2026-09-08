@@ -97,3 +97,51 @@ async fn an_authenticated_edit_survives_http_and_returns_a_conflict_for_stale_re
     let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(value["config"]["value"]["name"], "Team");
 }
+
+#[tokio::test]
+async fn runs_require_a_ready_runtime_and_control_pause_is_durable() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = AppState::new(
+        Engine::open(dir.path()).unwrap(),
+        "test-token-at-least-32-characters-long".into(),
+        vec![],
+    )
+    .unwrap();
+    let app = router(state.clone());
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/runs")
+                .header(
+                    "authorization",
+                    "Bearer test-token-at-least-32-characters-long",
+                )
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"key":"a","input":{"prompt":"Run"}}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/control")
+                .header(
+                    "authorization",
+                    "Bearer test-token-at-least-32-characters-long",
+                )
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"action":"pause"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(state.engine.lock().await.scheduler.paused);
+}
