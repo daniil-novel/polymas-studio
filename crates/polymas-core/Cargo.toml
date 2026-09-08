@@ -18,6 +18,8 @@ toml = "0.9"
 regex = "1"
 cap-std = "4.0.3"
 url = "2"
+rmcp = { version = "3.2.0", default-features = false, features = ["client", "server", "transport-io", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest-native-tls"] }
+reqwest = { version = "0.13.2", default-features = false, features = ["native-tls", "json", "stream"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Security"] }
