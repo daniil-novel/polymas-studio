@@ -55,6 +55,9 @@ pub enum ConfigCommand {
     ArchiveAgent {
         agent_id: String,
     },
+    ArchiveAgents {
+        agent_ids: Vec<String>,
+    },
     SetArchitecture {
         architecture: Architecture,
     },
@@ -76,10 +79,69 @@ impl ConfigCommand {
             Self::PinRole { .. } => "agents.role_pinned",
             Self::RenameAgent { .. } => "agent.renamed",
             Self::ArchiveAgent { .. } => "agent.archived",
+            Self::ArchiveAgents { .. } => "agents.archived",
             Self::SetArchitecture { .. } => "architecture.changed",
             Self::SetNodePosition { .. } => "graph.position_changed",
             Self::SetBindings { .. } => "bindings.changed",
         }
+    }
+    pub(crate) fn archived_agent_ids(&self) -> Option<&[String]> {
+        match self {
+            Self::ArchiveAgent { agent_id } => Some(std::slice::from_ref(agent_id)),
+            Self::ArchiveAgents { agent_ids } => Some(agent_ids),
+            _ => None,
+        }
+    }
+}
+
+impl Configuration {
+    fn archive_agents(&mut self, agent_ids: &[String]) -> Result<()> {
+        self.registry.archive_many(agent_ids)?;
+        let ids: HashSet<_> = agent_ids.iter().collect();
+        self.architecture
+            .edges
+            .retain(|edge| !ids.contains(&edge.from) && !ids.contains(&edge.to));
+        self.architecture
+            .positions
+            .retain(|id, _| !ids.contains(id));
+        for holon in &mut self.architecture.holons {
+            holon.members.retain(|id| !ids.contains(id));
+            if holon
+                .coordinator_agent_id
+                .as_ref()
+                .is_some_and(|id| ids.contains(id))
+            {
+                holon.coordinator_agent_id = None;
+            }
+        }
+        if self
+            .architecture
+            .coordinator_agent_id
+            .as_ref()
+            .is_some_and(|id| ids.contains(id))
+        {
+            self.architecture.coordinator_agent_id = None;
+            self.architecture.preset = Preset::Custom;
+        }
+        self.bindings
+            .retain(|binding| !matches!(&binding.subject, Subject::Agent {id} if ids.contains(id)));
+        let remaining = self
+            .registry
+            .agents
+            .iter()
+            .filter(|agent| agent.status != AgentStatus::Archived)
+            .count();
+        self.architecture.max_concurrency = self.architecture.max_concurrency.min(remaining.max(1));
+        if remaining == 0 {
+            self.architecture.preset = Preset::Network;
+        }
+        if remaining == 1 {
+            self.architecture.coordinator_agent_id = None;
+            if self.architecture.preset == Preset::Star {
+                self.architecture.preset = Preset::Custom;
+            }
+        }
+        Ok(())
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -233,46 +295,12 @@ impl Workspace {
                 json!({})
             }
             ConfigCommand::ArchiveAgent { agent_id } => {
-                candidate.registry.archive(&agent_id)?;
-                candidate
-                    .architecture
-                    .edges
-                    .retain(|e| e.from != agent_id && e.to != agent_id);
-                candidate.architecture.positions.remove(&agent_id);
-                for holon in &mut candidate.architecture.holons {
-                    holon.members.retain(|a| a != &agent_id);
-                    if holon.coordinator_agent_id.as_deref() == Some(&agent_id) {
-                        holon.coordinator_agent_id = None;
-                    }
-                }
-                if candidate.architecture.coordinator_agent_id.as_deref() == Some(&agent_id) {
-                    candidate.architecture.coordinator_agent_id = None;
-                    candidate.architecture.preset = Preset::Custom;
-                }
-                candidate.bindings.retain(|b| {
-                    b.subject
-                        != (Subject::Agent {
-                            id: agent_id.clone(),
-                        })
-                });
-                let remaining = candidate
-                    .registry
-                    .agents
-                    .iter()
-                    .filter(|a| a.status != AgentStatus::Archived)
-                    .count();
-                candidate.architecture.max_concurrency =
-                    candidate.architecture.max_concurrency.min(remaining.max(1));
-                if remaining == 0 {
-                    candidate.architecture.preset = Preset::Network;
-                }
-                if remaining == 1 {
-                    candidate.architecture.coordinator_agent_id = None;
-                    if candidate.architecture.preset == Preset::Star {
-                        candidate.architecture.preset = Preset::Custom;
-                    }
-                }
+                candidate.archive_agents(&[agent_id])?;
                 json!({})
+            }
+            ConfigCommand::ArchiveAgents { agent_ids } => {
+                candidate.archive_agents(&agent_ids)?;
+                json!({"ids":agent_ids})
             }
             ConfigCommand::SetArchitecture { architecture } => {
                 candidate.architecture = architecture;

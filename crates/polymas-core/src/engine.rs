@@ -189,10 +189,15 @@ impl Engine {
         Ok(engine)
     }
     pub fn configure(&mut self, revision: i64, command: ConfigCommand) -> Result<Value> {
-        if let ConfigCommand::ArchiveAgent { agent_id } = &command {
+        if let Some(agent_ids) = command.archived_agent_ids() {
+            require(
+                !agent_ids.is_empty() && agent_ids.len() <= crate::registry::MAX_AGENTS,
+                "Выберите от 1 до 5000 экземпляров",
+            )?;
+            let selected: std::collections::HashSet<_> = agent_ids.iter().collect();
             require(
                 !self.scheduler.tasks.iter().any(|t| {
-                    &t.assignee == agent_id
+                    selected.contains(&t.assignee)
                         && matches!(
                             t.state,
                             TaskState::Queued

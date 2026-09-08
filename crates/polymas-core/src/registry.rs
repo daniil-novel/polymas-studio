@@ -1,6 +1,6 @@
 use crate::error::{Error, Result, require};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use uuid::Uuid;
 
 pub const MAX_AGENTS: usize = 5000;
@@ -280,14 +280,40 @@ impl Registry {
         Ok(())
     }
     pub fn archive(&mut self, id: &str) -> Result<()> {
-        let a = self.agent_mut(id)?;
-        if matches!(
-            a.status,
-            AgentStatus::Running | AgentStatus::Stopping | AgentStatus::Queued
-        ) {
-            return Err(Error::Conflict("Сначала остановите задачи агента".into()));
+        self.archive_many(&[id.to_owned()])
+    }
+    pub fn archive_many(&mut self, ids: &[String]) -> Result<()> {
+        require(
+            !ids.is_empty() && ids.len() <= MAX_AGENTS,
+            "Выберите от 1 до 5000 экземпляров",
+        )?;
+        let unique: HashSet<_> = ids.iter().collect();
+        require(unique.len() == ids.len(), "Повторный ID экземпляра")?;
+        let indexed: HashMap<_, _> = self
+            .agents
+            .iter()
+            .enumerate()
+            .map(|(index, agent)| (agent.id.as_str(), index))
+            .collect();
+        let indices = ids
+            .iter()
+            .map(|id| {
+                let index = *indexed
+                    .get(id.as_str())
+                    .ok_or_else(|| Error::NotFound("Агент не найден".into()))?;
+                require(
+                    matches!(
+                        self.agents[index].status,
+                        AgentStatus::Idle | AgentStatus::Failed | AgentStatus::Archived
+                    ),
+                    "Сначала остановите задачи и проверьте состояние агента",
+                )?;
+                Ok(index)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        for index in indices {
+            self.agents[index].status = AgentStatus::Archived;
         }
-        a.status = AgentStatus::Archived;
         Ok(())
     }
 }
