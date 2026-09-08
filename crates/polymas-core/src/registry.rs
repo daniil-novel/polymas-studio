@@ -212,6 +212,16 @@ impl Registry {
         let source = self.role(role_id, source_version)?.draft.clone();
         self.revise_role(role_id, expected_version, source)
     }
+    pub fn duplicate_role(
+        &mut self,
+        role_id: &str,
+        source_version: u32,
+        name: String,
+    ) -> Result<RoleVersion> {
+        let mut draft = self.role(role_id, source_version)?.draft.clone();
+        draft.name = name;
+        self.create_role(draft)
+    }
     pub fn create_batch(&mut self, key: &str, request: BatchRequest) -> Result<Vec<String>> {
         require(
             !key.is_empty() && key.len() <= 128,

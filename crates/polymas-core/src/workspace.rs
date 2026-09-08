@@ -44,6 +44,12 @@ pub enum ConfigCommand {
         source_version: u32,
         expected_version: u32,
     },
+    DuplicateRole {
+        key: String,
+        role_id: String,
+        source_version: u32,
+        name: String,
+    },
     CreateAgents {
         key: String,
         request: BatchRequest,
@@ -81,6 +87,7 @@ impl ConfigCommand {
             Self::CreateRole { .. } => "role.created",
             Self::ReviseRole { .. } => "role.revised",
             Self::RestoreRole { .. } => "role.restored",
+            Self::DuplicateRole { .. } => "role.duplicated",
             Self::CreateAgents { .. } => "agents.created",
             Self::PinRole { .. } => "agents.role_pinned",
             Self::RenameAgent { .. } => "agent.renamed",
@@ -99,6 +106,19 @@ impl ConfigCommand {
         }
     }
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+struct RoleDuplicationInput {
+    role_id: String,
+    source_version: u32,
+    name: String,
+}
+#[derive(Serialize, Deserialize)]
+struct RoleDuplicationReceipt {
+    input: RoleDuplicationInput,
+    result: Value,
+}
+const ROLE_DUPLICATION_RECEIPTS: &str = "role_duplication_receipts";
 
 impl Configuration {
     fn archive_agents(&mut self, agent_ids: &[String]) -> Result<()> {
@@ -253,6 +273,39 @@ impl Workspace {
         self.db.list("configuration_history", 1000)
     }
     pub fn configure(&mut self, expected: i64, command: ConfigCommand) -> Result<Value> {
+        let duplication = if let ConfigCommand::DuplicateRole {
+            key,
+            role_id,
+            source_version,
+            name,
+        } = &command
+        {
+            require(
+                !key.trim().is_empty() && key.len() <= 128,
+                "Некорректный ключ операции",
+            )?;
+            let input = RoleDuplicationInput {
+                role_id: role_id.clone(),
+                source_version: *source_version,
+                name: name.clone(),
+            };
+            // An exact retry is a receipt read, even when its original CAS is now stale.
+            if let Some(receipt) = self
+                .db
+                .get::<RoleDuplicationReceipt>(ROLE_DUPLICATION_RECEIPTS, key)?
+            {
+                return if receipt.value.input == input {
+                    Ok(receipt.value.result)
+                } else {
+                    Err(Error::Conflict(
+                        "Ключ уже использован для другой копии роли".into(),
+                    ))
+                };
+            }
+            Some((key.clone(), input))
+        } else {
+            None
+        };
         if expected != self.config.revision {
             return Err(Error::Conflict(
                 "Конфигурация изменилась; обновите редактор".into(),
@@ -294,6 +347,17 @@ impl Workspace {
             }
             ConfigCommand::CreateAgents { key, request } => {
                 json!({"ids":candidate.registry.create_batch(&key,request)?})
+            }
+            ConfigCommand::DuplicateRole {
+                role_id,
+                source_version,
+                name,
+                ..
+            } => {
+                let role = candidate
+                    .registry
+                    .duplicate_role(&role_id, source_version, name)?;
+                json!({"role":role,"sourceRoleId":role_id,"sourceVersion":source_version})
             }
             ConfigCommand::PinRole {
                 agent_ids,
@@ -389,6 +453,17 @@ impl Workspace {
         // History is part of the same commit as the new revision and event.
         let revision = self.db.transaction(|tx| {
             let revision = tx.put("workspace", "configuration", expected, &candidate)?;
+            if let Some((key, input)) = &duplication {
+                tx.put(
+                    ROLE_DUPLICATION_RECEIPTS,
+                    key,
+                    0,
+                    &RoleDuplicationReceipt {
+                        input: input.clone(),
+                        result: result.clone(),
+                    },
+                )?;
+            }
             tx.put(
                 "configuration_history",
                 &revision.to_string(),
