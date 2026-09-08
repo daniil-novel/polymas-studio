@@ -22,5 +22,6 @@
 | D11 | `knowledge` отсутствует, E0432 | Provenance после reopen; неизменяемая версия источника; namespace isolation; retention; явная проверка и contradicts | Утверждения не становятся истинными автоматически; UI/gateway далее |
 | D12a | `artifacts` отсутствует, E0432 | Неизменяемые версии, обнаружение corrupt blob, запрет импорта за пределами workspace | Максимум 64 МиБ на артефакт; preview реализуется в UI |
 | D12b | `backup` отсутствует, E0432 | Snapshot не включает последующие события; blobs восстанавливаются с hash; corrupt database отклоняется до публикации; существующая папка не перезаписывается | Двухфайловая fixture, не NFR-10 benchmark; OS secrets и provider sessions в backup не входят |
+| D13a | `workspace` отсутствует, E0432 | Роли/10 экземпляров сохраняются после reopen; stale revision и invalid draft не меняют данные; MCP draft не может подделать Ready | Transport и runtime loop следуют отдельными срезами |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.
