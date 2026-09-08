@@ -93,3 +93,76 @@ fn message_loops_stop_at_hop_budget_and_identity_cannot_be_forged() {
     wrong.reply_to = Some(first.id);
     assert!(Router::send(&mut db, &a, "run", "a", "forged", wrong, 102).is_err());
 }
+
+#[test]
+fn inbox_queries_scope_the_run_before_limiting_and_expose_only_delivered_messages() {
+    let mut db = Store::memory().unwrap();
+    for n in 0..100 {
+        Router::send(
+            &mut db,
+            &architecture(),
+            "other-run",
+            "a",
+            &format!("m{n}"),
+            input("b"),
+            100,
+        )
+        .unwrap();
+    }
+    let first = Router::send(
+        &mut db,
+        &architecture(),
+        "current-run",
+        "a",
+        "first",
+        input("b"),
+        101,
+    )
+    .unwrap();
+    let second = Router::send(
+        &mut db,
+        &architecture(),
+        "current-run",
+        "a",
+        "second",
+        input("b"),
+        102,
+    )
+    .unwrap();
+    assert_eq!(
+        Router::pending_for_run(&db, "current-run", "b", 103, 1).unwrap()[0].id,
+        first.id
+    );
+    assert!(
+        Router::inbox(&db, "current-run", "b", 0, 1, 103)
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    Router::deliver(
+        &mut db,
+        "b",
+        &[first.id.clone(), second.id.clone()],
+        "attempt",
+        103,
+    )
+    .unwrap();
+    let page = Router::inbox(&db, "current-run", "b", 0, 1, 104).unwrap();
+    assert_eq!(page.items[0].id, first.id);
+    assert!(page.has_more);
+    let next = Router::inbox(&db, "current-run", "b", page.cursor, 1, 104).unwrap();
+    assert_eq!(next.items[0].id, second.id);
+    assert!(!next.has_more);
+    assert!(
+        Router::inbox(&db, "current-run", "a", 0, 100, 104)
+            .unwrap()
+            .items
+            .is_empty()
+    );
+    assert!(
+        Router::inbox(&db, "current-run", "b", 0, 100, 1000)
+            .unwrap()
+            .items
+            .is_empty()
+    );
+}

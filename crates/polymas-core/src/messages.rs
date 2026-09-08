@@ -45,6 +45,13 @@ pub struct Message {
     pub delivered_attempt: Option<String>,
 }
 pub struct Router;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InboxPage {
+    pub items: Vec<Message>,
+    pub cursor: i64,
+    pub has_more: bool,
+}
 fn digest(value: &str) -> String {
     format!("{:x}", Sha256::digest(value.as_bytes()))
 }
@@ -66,6 +73,55 @@ fn save_message(conn: &rusqlite::Connection, message: &Message) -> Result<()> {
     Ok(())
 }
 impl Router {
+    pub fn pending_for_run(
+        db: &Store,
+        run_id: &str,
+        recipient: &str,
+        timestamp: i64,
+        limit: usize,
+    ) -> Result<Vec<Message>> {
+        require((1..=100).contains(&limit), "Размер inbox batch: 1–100")?;
+        let mut query = db.connection().prepare("SELECT document FROM messages WHERE run_id=?1 AND recipient=?2 AND state='queued' AND expires_at>?3 ORDER BY rowid LIMIT ?4")?;
+        let rows = query.query_map(params![run_id, recipient, timestamp, limit as i64], |r| {
+            r.get::<_, String>(0)
+        })?;
+        rows.map(|r| Ok(serde_json::from_str(&r?)?)).collect()
+    }
+    /// Queued messages enter an exec turn through its recorded stdin batch. The
+    /// read-only MCP inbox exposes only messages already delivered to this agent.
+    pub fn inbox(
+        db: &Store,
+        run_id: &str,
+        recipient: &str,
+        after: i64,
+        limit: usize,
+        timestamp: i64,
+    ) -> Result<InboxPage> {
+        require(
+            after >= 0 && (1..=100).contains(&limit),
+            "Некорректный cursor или размер страницы 1–100",
+        )?;
+        let mut query = db.connection().prepare("SELECT rowid,document FROM messages WHERE run_id=?1 AND recipient=?2 AND rowid>?3 AND state IN ('delivered_to_context','acknowledged') AND expires_at>?4 ORDER BY rowid LIMIT ?5")?;
+        let rows = query.query_map(
+            params![run_id, recipient, after, timestamp, (limit + 1) as i64],
+            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)),
+        )?;
+        let mut page = InboxPage {
+            items: vec![],
+            cursor: after,
+            has_more: false,
+        };
+        for row in rows {
+            let (cursor, document) = row?;
+            if page.items.len() == limit {
+                page.has_more = true;
+                break;
+            }
+            page.items.push(serde_json::from_str(&document)?);
+            page.cursor = cursor;
+        }
+        Ok(page)
+    }
     pub fn send(
         db: &mut Store,
         architecture: &Architecture,

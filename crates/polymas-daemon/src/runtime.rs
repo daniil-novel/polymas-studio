@@ -138,15 +138,13 @@ async fn prepare(state: &AppState, task: &Task) -> Result<(CodexRequest, Attempt
     };
     let mut inbox = vec![];
     let mut size = 0;
-    for message in Router::pending(
+    for message in Router::pending_for_run(
         &engine.workspace.db,
+        &task.run_id,
         &task.assignee,
         chrono::Utc::now().timestamp(),
         100,
     )? {
-        if message.run_id != task.run_id {
-            continue;
-        }
         let bytes = serde_json::to_vec(&message)?.len();
         if size + bytes > 65536 {
             break;

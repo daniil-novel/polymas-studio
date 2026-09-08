@@ -38,6 +38,10 @@
 
 ### D15 visual follow-up
 
+D10 actual read smoke: computer use → реальный Codex 0.144.1, PID 29644, task 870471fb-7da3-455f-8d3d-876b26c90c8a → polymas_list_sources / polymas_read_source → read_text completed success=true → точный POLYMAS-KNOWLEDGE-93. Результат и артефакт приняты через UI. В MCP runtime events только metadata; источник не дублируется в activity payload. Экран результата проверен зрительно 1600×1000. Это Files, не Neo4j и не concurrency gate.
+
+D08 scoped inbox: RED отсутствовали run-filtered pending и cursor inbox. GREEN 100 сообщений другого run не скрывают нужное; queued не выдаётся как доставленное; страницы/recipient/expiry соблюдаются. Четыре message tests, два runtime tests и clippy.
+
 D10 runtime event review: RED отсутствовала отдельная observable projection. GREEN MCP arguments/result/error content не копируются в event, имя/status сохранены, reasoning исключён, обычный progress видим. Семь codex contract tests и clippy. Это защита новых событий; провайдер может хранить собственную сессию отдельно от PolyMAS.
 
 D10 actual Codex finding: PID 24540 обнаружил файловый источник, но Codex отклонил polymas_call_source до gateway как потенциальную запись (`user cancelled MCP tool call`). Это не успешный read smoke. RED нового regression показал отсутствие отдельного read interface. GREEN polymas_read_source объявлен read-only и отклоняет разрешённый write tool до call_started; пять gateway tests и clippy. Политика approval/sandbox не ослаблялась. [Codex MCP approval modes](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) проверены 2026-09-08.
