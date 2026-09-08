@@ -1,10 +1,9 @@
 use polymas_core::codex::{CodexRequest, JsonlDecoder, build_arguments};
 use polymas_core::registry::Sandbox;
-use std::path::PathBuf;
 
 fn request(session: Option<String>) -> CodexRequest {
     CodexRequest {
-        workspace: PathBuf::from("C:/Agent Work/one"),
+        workspace: std::env::temp_dir().join("Agent Work/one"),
         session_id: session,
         model: None,
         sandbox: Sandbox::ReadOnly,
