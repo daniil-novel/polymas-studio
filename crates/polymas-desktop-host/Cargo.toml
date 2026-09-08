@@ -16,6 +16,7 @@ fs2 = "0.4.3"
 reqwest = { version = "0.13.2", default-features = false, features = ["native-tls", "json", "stream"] }
 
 [dev-dependencies]
+tempfile.workspace = true
 axum = "0.8"
 
 [lints]

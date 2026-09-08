@@ -1,5 +1,7 @@
 # Проверки реализации
 
+D14g: RED отсутствующий Preferences. GREEN первый запуск требует выбора, background/stop сохраняются после reopen, reset возвращает вопрос, неизвестный enum отклонён. Три desktop-host tests и clippy пройдены. Это persistence, не ещё проверенное поведение окна.
+
 Native drain: RED отсутствующий stop; дополнительный RED на Windows ERROR_LOCK_VIOLATION исправлен сопоставлением fs2 lock_contended_error. GREEN после stop другая Workspace сразу получает exclusive lock. Пять native_host tests с настоящими процессами и clippy пройдены.
 
 Native API client: RED три сценария — потеря ApiError/409, отправка pre-aborted команды и импорт hash credential. GREEN native IPC regression, полный frontend typecheck/lint/tests/build. Отмена после отправки не обещает отменить серверную мутацию; outcome проверяется по task/idempotency.
