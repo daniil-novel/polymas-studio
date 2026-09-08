@@ -25,5 +25,6 @@
 | D13a | `workspace` отсутствует, E0432 | Роли/10 экземпляров сохраняются после reopen; stale revision и invalid draft не меняют данные; MCP draft не может подделать Ready | Transport и runtime loop следуют отдельными срезами |
 | D13a fix | Реальный Windows Junction в `agents` обходил проверку containment; regression FAILED | Exact directory identity до создания workspace, parent/agent aliases отклоняются, второй service не получает lock | Это проверка путей перед launch, не полная сертификация sandbox |
 | D13b | `engine` отсутствует, E0432 | Claim → restart → unknown; нет автоповтора; pinned role; acceptance после reopen; active archive/stale fence отклонены | Реальный исполнительный loop подключается следующим срезом |
+| D13c | AppState/router отсутствуют, E0432 | Missing token/foreign Origin → 401; авторизованное редактирование → 200; stale revision → 409; данные читаются через HTTP router | Локальный owner transport; remote RBAC отдельный этап |
 
 Реальные provider тесты выполняются только отдельно, не в обычном CI. Отчёты не содержат credentials и приватных задач. Production matrix будет записана в `acceptance.md`.

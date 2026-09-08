@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/polymas-core"]
+members = ["crates/polymas-core", "crates/polymas-daemon"]
 resolver = "2"
 
 [workspace.package]

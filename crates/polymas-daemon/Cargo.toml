@@ -1,0 +1,27 @@
+[package]
+name = "polymas-daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+polymas-core = { path = "../polymas-core" }
+axum = "0.8"
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+subtle = "2.6"
+reqwest = { version = "0.13.2", default-features = false, features = ["native-tls", "json", "stream"] }
+rmcp = { version = "3.2.0", default-features = false, features = ["server", "transport-io"] }
+tower-http = { version = "0.6", features = ["fs", "compression-gzip", "set-header"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+
+[lints]
+workspace = true
