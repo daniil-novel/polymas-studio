@@ -38,6 +38,10 @@
 
 ### D15 visual follow-up
 
+D10g actual messaging smoke: run 8c2f9ad7-4fdb-435f-8090-36901a2eb532, Codex PID 10372 → 2756, C=1. Первый ответ SENT:POLYMAS-MESSAGE-83, второй RECEIVED:POLYMAS-MESSAGE-83; ровно по одному message.queued, delivered_to_context, acknowledged. Оба результата приняты после проверки событий. Никаких новых approval overrides для этого теста не вводилось. Computer use наблюдал второй работающий узел; короткий импульс ребра не зафиксирован на статическом кадре и отдельно не заявляется как визуально подтверждённый.
+
+D16 hover visual fix: computer vision обнаружило светлый текст на белой стандартной hover-плашке Sigma. Заменён только renderer подписи; после пересоздания WebGL представления подпись читается на тёмной карточке, остальные группы/связи на месте. 21 UI test, TS/lint/build; фактическая сверка 1600×1000. Новый unit test для статического оформления не добавлялся.
+
 D10g: RED polymas_list_peers возвращал isError. GREEN два scope → разрешённый peer → одно durable message при повторе ключа; queued отсутствует в delivered inbox; после fixture stdin receipt содержимое доступно только получателю; чужой ack и отозванное ребро отклонены. Шесть gateway tests, четыре message tests и clippy. Тест не запускает модельную переписку; send не создаёт задачу автоматически, delegation/wait-resume отдельные срезы.
 
 D10 actual read smoke: computer use → реальный Codex 0.144.1, PID 29644, task 870471fb-7da3-455f-8d3d-876b26c90c8a → polymas_list_sources / polymas_read_source → read_text completed success=true → точный POLYMAS-KNOWLEDGE-93. Результат и артефакт приняты через UI. В MCP runtime events только metadata; источник не дублируется в activity payload. Экран результата проверен зрительно 1600×1000. Это Files, не Neo4j и не concurrency gate.

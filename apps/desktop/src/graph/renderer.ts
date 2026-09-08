@@ -35,6 +35,28 @@ export class GraphRenderer {
       labelFont: 'Inter, Segoe UI, sans-serif',
       labelSize: 12,
       labelWeight: '400',
+      defaultDrawNodeHover: (context, data, settings) => {
+        if (!data.label) return;
+        context.save();
+        context.font = `500 12px ${settings.labelFont}`;
+        let label = data.label;
+        while (label.length > 1 && context.measureText(label).width > 240)
+          label = label.slice(0, -1);
+        if (label !== data.label) label += '…';
+        const width = context.measureText(label).width;
+        const x = data.x + data.size + 7;
+        context.fillStyle = '#202733';
+        context.strokeStyle = '#46545F';
+        context.lineWidth = 1;
+        context.beginPath();
+        context.roundRect(x - 6, data.y - 13, width + 12, 26, 5);
+        context.fill();
+        context.stroke();
+        context.fillStyle = '#E7EDF5';
+        context.textBaseline = 'middle';
+        context.fillText(label, x, data.y);
+        context.restore();
+      },
       labelDensity: 0.5,
       labelRenderedSizeThreshold: 5,
       stagePadding: 65,
