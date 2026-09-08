@@ -150,6 +150,9 @@ pub async fn run_process(
     let input_size = input.len();
     let mut input_task = tokio::spawn(async move {
         stdin.write_all(&input).await?;
+        // Windows Tokio ChildStdin uses a blocking buffer. shutdown() alone
+        // does not await the pending OS write or report its error.
+        stdin.flush().await?;
         stdin.shutdown().await
     });
     let mut decoder = JsonlDecoder::default();

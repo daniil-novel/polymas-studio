@@ -47,9 +47,10 @@ async fn confirmed_input_delivery_is_observable_and_a_broken_input_pipe_is_failu
         "import os,time; os.close(0); time.sleep(.1); print('{\"type\":\"turn.completed\"}')",
     );
     spec.stdin = "x".repeat(2 * 1024 * 1024);
+    let failed_input = run_process(spec, tx, stop).await;
     assert!(
-        run_process(spec, tx, stop).await.is_err(),
-        "A success event cannot hide failure to transfer the input"
+        failed_input.is_err(),
+        "A success event cannot hide failure to transfer the input: {failed_input:?}"
     );
 }
 #[tokio::test]
