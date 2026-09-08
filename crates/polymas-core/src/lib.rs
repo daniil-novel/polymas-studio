@@ -8,5 +8,6 @@ pub mod messages;
 pub mod process;
 pub mod registry;
 pub mod scheduler;
+pub mod secrets;
 pub mod storage;
 pub mod topology;
