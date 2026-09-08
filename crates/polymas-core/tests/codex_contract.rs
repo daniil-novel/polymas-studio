@@ -13,6 +13,27 @@ fn request(session: Option<String>) -> CodexRequest {
     }
 }
 #[test]
+fn request_debug_never_serializes_private_prompt_or_launch_credentials() {
+    let mut r = request(None);
+    r.prompt = "PRIVATE-PROMPT-62".into();
+    r.environment
+        .insert("POLYMAS_GRANT".into(), "SECRET-GATEWAY-89".into());
+    r.gateway = Some(polymas_core::codex::McpLaunch {
+        command: std::env::temp_dir().join("fixture.exe"),
+        args: vec!["PRIVATE-LAUNCH-12".into()],
+        env_vars: vec!["POLYMAS_GRANT".into()],
+    });
+    let debug = format!("{r:?} {:?}", r.gateway);
+    for private in [
+        &r.prompt,
+        &r.environment["POLYMAS_GRANT"],
+        &r.gateway.as_ref().unwrap().args[0],
+    ] {
+        assert!(!debug.contains(private));
+    }
+    assert!(debug.contains("ReadOnly"));
+}
+#[test]
 fn prompt_is_never_interpolated_in_shell_or_process_arguments() {
     let r = request(None);
     let args = build_arguments(&r).unwrap();

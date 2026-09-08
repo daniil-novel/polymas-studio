@@ -7,7 +7,7 @@ use std::path::PathBuf;
 pub const SUPPORTED_CODEX_VERSION: &str = "0.144.1";
 pub const MAX_EVENT_BYTES: usize = 1024 * 1024;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct CodexRequest {
     pub workspace: PathBuf,
     pub session_id: Option<String>,
@@ -19,11 +19,34 @@ pub struct CodexRequest {
     pub environment: std::collections::BTreeMap<String, String>,
 }
 
-#[derive(Clone, Debug)]
+impl std::fmt::Debug for CodexRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CodexRequest")
+            .field("workspace", &self.workspace)
+            .field("session_id", &self.session_id)
+            .field("sandbox", &self.sandbox)
+            .field("prompt_bytes", &self.prompt.len())
+            .field("environment_entries", &self.environment.len())
+            .field("gateway_enabled", &self.gateway.is_some())
+            .field("timeout_seconds", &self.timeout_seconds)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone)]
 pub struct McpLaunch {
     pub command: PathBuf,
     pub args: Vec<String>,
     pub env_vars: Vec<String>,
+}
+impl std::fmt::Debug for McpLaunch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("McpLaunch")
+            .field("command", &self.command)
+            .field("argument_count", &self.args.len())
+            .field("environment_entries", &self.env_vars.len())
+            .finish_non_exhaustive()
+    }
 }
 
 fn toml_string(value: &str) -> String {

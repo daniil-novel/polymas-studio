@@ -1,5 +1,7 @@
 # Проверки реализации
 
+Codex Debug review: RED обычный derived Debug содержал fixture prompt и credentials. GREEN восемь codex_contract tests и clippy; Debug показывает размеры/counts, sandbox и служебные пути, исключая текст задачи/аргументы/env values. Проверка не утверждает очистку сторонних provider logs.
+
 D25a: README сверён с существующими scripts/UI/runtime и фактической Tauri build. Проверены 50 локальных ссылок; инструкции отличают native от browser, real provider от fixtures и capacity=1 от целевого масштаба. Runtime behavior не меняется, искусственные unit tests для prose не добавлялись.
 
 D14i: RED отсутствующий navigation guard; IPC regression действительно исполняет Tauri dispatch с generated capabilities (MockRuntime), main/local получает status и structured not_ready, другое окно/внешний origin отклонены. RED verify_no_service → GREEN нельзя назвать занятый workspace остановленным. Три native shell tests/clippy; `tauri build --debug --no-bundle` создал настоящий exe со встроенным React. На Windows 10 запущен PID 9948 с title PolyMAS Studio, создан default workspace и daemon PID 4788; stderr пуст. Отдельный opt-in actual OS vault reconnect/stop/credential cleanup прошёл. Это не подтверждение интерактивного tray/close: Windows Computer Use после reset дважды вернул `failed to write kernel assets (os error 3)`. Browser CU shared React 1600×1000: 12 узлов в 3 группах, инспектор/мини-карта/история без обрезания; error/warn log пуст. Windows 11, installer drain/signing и native screenshot gate ещё открыты.
