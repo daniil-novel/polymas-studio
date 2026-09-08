@@ -35,6 +35,15 @@ pub async fn request(state: &AppState, scope: &Scope, input: WaitInput) -> Resul
     let mut engine = state.engine.lock().await;
     validate(&engine, scope)?;
     require(
+        polymas_core::policy::ApprovalLedger::for_attempt(
+            &engine.workspace.db,
+            &scope.task_id,
+            scope.epoch,
+        )?
+        .is_none(),
+        "В этой попытке уже запрошено решение владельца; завершите turn",
+    )?;
+    require(
         (1..=86400).contains(&input.timeout_seconds)
             && !input.summary.trim().is_empty()
             && input.summary.len() <= 20000,

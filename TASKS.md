@@ -36,6 +36,7 @@
   - [x] D10s. Runtime после успешного reap сохраняет partial и waiting_user; решение/expiry будит reserved turn той же task session, контекст содержит approval ID. Проверено дочерним fixture process; owner API/UI и gateway tools далее.
   - [x] D10t. Потерянный executing lease превращает внешний исход в unknown; до явной сверки запрещены retry/accept задачи. Sweep использует индекс состояния и metadata; owner reconciliation в core, его UI/API далее.
   - [x] D10u. Debug approval/operation не раскрывает аргументы и ресурс; regression проверяет вложенное содержимое без изменения сохраняемой операции.
+  - [x] D10v. Gateway request/status: служба задаёт identity и резерв, 15-минутный срок, retry без продления, статус только origin/точному continuation; взаимоисключение с message wait. Исполнение внешнего вызова следующим срезом.
   - [x] D18c. Owner approvals API: страницы metadata, frozen target/точные аргументы, доступность решения, CAS/повтор; agent credential не допускается. UI и MCP инструменты далее.
   - [x] D18d. Экран подтверждений: фильтры/страницы, точные параметры, решение без подмены, guard при late response/disconnect; waiting_user в задачах/графе/replay. CU fixture 1600×1000 и 1280×800, отказ сохранён. Agent request/execute инструменты и actual Codex write smoke далее.
   - [x] D18e. Owner API/форма сверки unknown с проверенным исходом и заметкой, CAS/idempotency, история результата; черновик переживает обновление карточки. CU отдельного fixture, без внешнего вызова.

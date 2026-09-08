@@ -5,6 +5,7 @@ pub mod connection_api;
 pub mod gateway;
 pub mod gateway_knowledge;
 pub mod gateway_messages;
+pub mod gateway_operations;
 pub mod gateway_tools;
 pub mod gateway_wait;
 pub mod knowledge_api;
