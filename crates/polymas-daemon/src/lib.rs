@@ -1,4 +1,5 @@
 //! Local authenticated control plane. The desktop and worker bridge use separate credentials.
+pub mod connection_api;
 pub mod run_api;
 pub mod runtime;
 use axum::{
@@ -79,6 +80,7 @@ impl IntoResponse for ApiError {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(run_api::routes())
+        .merge(connection_api::routes())
         .route("/api/state", get(snapshot))
         .route("/api/configure", post(configure))
         .route("/api/events", get(events))
