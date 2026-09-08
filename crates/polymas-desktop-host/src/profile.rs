@@ -8,13 +8,18 @@ use polymas_core::{
 };
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use std::{path::Path, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 pub struct NativeProfile {
     pub connection: Arc<NativeConnection>,
     pub record: ServiceRecord,
     pub reused: bool,
     pub warnings: Vec<String>,
+    workspace: PathBuf,
 }
 fn cleanup(db: &mut Store, key: &str, vault: &dyn CredentialVault) -> Result<Vec<String>> {
     let Some(saved) = db.get::<Vec<String>>("desktop_credential_cleanup", key)? else {
@@ -47,6 +52,31 @@ fn cleanup(db: &mut Store, key: &str, vault: &dyn CredentialVault) -> Result<Vec
     })
 }
 impl NativeProfile {
+    /// A successful HTTP response only accepts shutdown. Wait until the service
+    /// releases its workspace before allowing the native host to report stopped.
+    pub async fn stop(&self) -> Result<()> {
+        self.connection
+            .request("/api/control", Some(json!({"action":"shutdown"})))
+            .await
+            .map_err(|e| Error::Runtime(e.message))?;
+        let lock = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(self.workspace.join("workspace.lock"))?;
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
+        loop {
+            match fs2::FileExt::try_lock_exclusive(&lock) {
+                Ok(()) => return Ok(()),
+                Err(error)
+                    if error.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {}
+                Err(error) => return Err(error.into()),
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Err(Error::Timeout("Служба ещё удерживает рабочую область. Дождитесь остановки и проверьте исход активных задач.".into()));
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
     pub async fn connect(
         profile_dir: &Path,
         workspace: &Path,
@@ -87,6 +117,7 @@ impl NativeProfile {
                         record: saved.value.clone(),
                         reused: true,
                         warnings: cleanup(&mut db, &key, vault)?,
+                        workspace: canonical,
                     });
                 }
                 Err(Error::Runtime(_)) => {}
@@ -136,6 +167,7 @@ impl NativeProfile {
             record,
             reused: false,
             warnings,
+            workspace: canonical,
         })
     }
 }

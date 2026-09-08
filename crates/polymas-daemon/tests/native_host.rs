@@ -128,11 +128,9 @@ async fn durable_profile_reuses_the_same_daemon_and_keeps_credentials_in_the_vau
     let reused = second.reused;
     let second_pid = second.record.pid;
     let state = second.connection.request("/api/state", None).await.unwrap();
-    second
-        .connection
-        .request("/api/control", Some(json!({"action":"shutdown"})))
-        .await
-        .unwrap();
+    second.stop().await.unwrap();
+    let reopened = polymas_core::workspace::Workspace::open(&workspace).unwrap();
+    drop(reopened);
     let secrets: Vec<_> = vault.0.lock().unwrap().values().cloned().collect();
     drop(second);
     assert!(reused);

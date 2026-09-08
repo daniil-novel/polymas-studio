@@ -1,5 +1,7 @@
 # Проверки реализации
 
+Native drain: RED отсутствующий stop; дополнительный RED на Windows ERROR_LOCK_VIOLATION исправлен сопоставлением fs2 lock_contended_error. GREEN после stop другая Workspace сразу получает exclusive lock. Пять native_host tests с настоящими процессами и clippy пройдены.
+
 Native API client: RED три сценария — потеря ApiError/409, отправка pre-aborted команды и импорт hash credential. GREEN native IPC regression, полный frontend typecheck/lint/tests/build. Отмена после отправки не обещает отменить серверную мутацию; outcome проверяется по task/idempotency.
 
 D14f: RED отсутствующий NativeProfile. GREEN настоящий daemon сохраняет профиль, после drop повторное подключение возвращает тот же PID и workspace без второго credential; содержимое файлов профиля проверено на отсутствие credential bytes. Пять native_host tests и clippy пройдены. Vault в regression — in-memory fixture, проверка системного хранилища и окна ещё впереди. При ошибке удаления старой записи она остаётся в durable очереди очистки.
