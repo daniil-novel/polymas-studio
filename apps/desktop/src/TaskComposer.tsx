@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import { AgentPicker } from './AgentPicker';
 import type { Command } from './RoleEditor';
@@ -64,6 +64,7 @@ export function TaskComposer({
   initialAgentId,
   initialHolonId,
   onStarted,
+  onConfigureArchitecture,
   compact = false,
 }: {
   snapshot: Snapshot;
@@ -71,10 +72,12 @@ export function TaskComposer({
   initialAgentId?: string;
   initialHolonId?: string;
   onStarted?: (id: string) => void;
+  onConfigureArchitecture?: () => void;
   compact?: boolean;
 }) {
   const agents = snapshot.config.value.registry.agents.filter((a) => a.status !== 'archived');
   const architecture = snapshot.config.value.architecture;
+  const holonHelpId = useId();
   const [target, setTarget] = useState<Target>(() =>
     initialHolonId
       ? { type: 'holon', id: initialHolonId, recursive: false }
@@ -156,6 +159,7 @@ export function TaskComposer({
           <select
             disabled={busy}
             value={target.type}
+            aria-describedby={target.type === 'holon' ? holonHelpId : undefined}
             onChange={(e) => {
               setError('');
               setNotice('');
@@ -169,9 +173,7 @@ export function TaskComposer({
             }}
           >
             <option value="agent">Конкретному агенту</option>
-            <option value="holon" disabled={!architecture.holons.length}>
-              Холону
-            </option>
+            <option value="holon">Холону</option>
             <option value="system">Системе</option>
           </select>
         </label>
@@ -192,8 +194,18 @@ export function TaskComposer({
             Холон-получатель
             <select
               value={target.id}
-              onChange={(e) => setTarget({ ...target, id: e.target.value })}
+              disabled={busy || !architecture.holons.length}
+              onChange={(e) => {
+                const next = { ...target, id: e.target.value };
+                if (!target.id)
+                  setDrafts((old) => ({
+                    ...old,
+                    [JSON.stringify(next)]: old[JSON.stringify(next)] ?? old[identity] ?? blank,
+                  }));
+                setTarget(next);
+              }}
             >
+              <option value="">Выберите холон</option>
               {architecture.holons.map((h) => (
                 <option value={h.id} key={h.id}>
                   {h.name}
@@ -203,6 +215,29 @@ export function TaskComposer({
           </label>
         )}
       </div>
+      {target.type === 'holon' && (
+        <div id={holonHelpId} className="small muted">
+          {!architecture.holons.length ? (
+            <>
+              <p>
+                Холоны пока не созданы. В «Граф → Архитектура → Создать холон» задайте название,
+                добавьте участников и сохраните архитектуру. Затем выберите группу здесь.
+              </p>
+              {onConfigureArchitecture && (
+                <button type="button" disabled={busy} onClick={onConfigureArchitecture}>
+                  Настроить холоны
+                </button>
+              )}
+            </>
+          ) : (
+            <p>
+              Без рассылки задача поступит координатору холона, если он назначен. Рассылка создаёт
+              отдельные задачи участникам; общий ответ требует сценария обсуждения и сборки
+              результата.
+            </p>
+          )}
+        </div>
+      )}
       {target.type === 'system' && (
         <p className="small muted">
           {architecture.coordinatorAgentId
@@ -220,7 +255,7 @@ export function TaskComposer({
           Отправить всем {agents.length} агентам отдельные задачи
         </label>
       )}
-      {target.type === 'holon' && (
+      {target.type === 'holon' && architecture.holons.length > 0 && (
         <label className="checkbox-row">
           <input
             type="checkbox"

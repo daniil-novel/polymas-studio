@@ -19,6 +19,7 @@ type WorkspaceProps = {
   command: Command;
   onContinue: (id: string) => void;
   onReplay: (id: string) => void;
+  onConfigureArchitecture?: () => void;
   initialRunId?: string | null;
   active?: boolean;
 };
@@ -118,6 +119,7 @@ export function TasksWorkspace(props: WorkspaceProps) {
           <TaskComposer
             snapshot={snapshot}
             command={command}
+            onConfigureArchitecture={props.onConfigureArchitecture}
             onStarted={(id) => {
               open(id);
               setRefresh((n) => n + 1);

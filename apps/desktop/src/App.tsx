@@ -426,6 +426,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
                     client={client}
                     command={data.command}
                     onContinue={setChatAgentId}
+                    onConfigureArchitecture={() => setArchitectureOpen(true)}
                     initialRunId={returnRunId}
                     onReplay={(id) => {
                       setReturnRunId(id);
@@ -618,6 +619,7 @@ export function App({ client = defaultClient }: { client?: ApiClient }) {
               command={data.command}
               initialAgentId={chatAgentId ?? undefined}
               initialHolonId={chatHolonId ?? undefined}
+              onConfigureArchitecture={() => setArchitectureOpen(true)}
               onStarted={() => {
                 closeComposer();
                 setPage('tasks');

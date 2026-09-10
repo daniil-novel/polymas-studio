@@ -21,6 +21,29 @@ const snapshot = {
   tasks: [],
   runs: [],
 } as unknown as Snapshot;
+test('an empty holon target explains setup, preserves the draft and never dispatches a task', async () => {
+  const command = vi.fn();
+  const onConfigureArchitecture = vi.fn();
+  render(
+    <TaskComposer
+      snapshot={snapshot}
+      command={command}
+      onConfigureArchitecture={onConfigureArchitecture}
+    />,
+  );
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText('Задача или сообщение'), 'Придумайте совместную шутку');
+  await user.selectOptions(screen.getByLabelText('Адресация'), 'holon');
+  expect(screen.getByText(/Холоны пока не созданы/)).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Начать' }).hasAttribute('disabled')).toBe(true);
+  await user.click(screen.getByRole('button', { name: 'Настроить холоны' }));
+  expect(onConfigureArchitecture).toHaveBeenCalledTimes(1);
+  expect(command).not.toHaveBeenCalled();
+  await user.selectOptions(screen.getByLabelText('Адресация'), 'agent');
+  expect((screen.getByLabelText('Задача или сообщение') as HTMLTextAreaElement).value).toBe(
+    'Придумайте совместную шутку',
+  );
+});
 test('an agent message has one explicit recipient and preserves retry identity after an uncertain response', async () => {
   const command = vi
     .fn()
