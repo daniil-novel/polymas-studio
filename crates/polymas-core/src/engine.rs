@@ -117,8 +117,21 @@ impl Engine {
             }
             let reason = if timestamp >= condition.deadline_at {
                 Some(
-                    "Истёк срок ожидания сообщения. Сообщите об ограничении или примените правило эскалации роли.",
+                    "Истёк срок ожидания обмена. Сообщите об ограничении или примените правило эскалации роли.",
                 )
+            } else if let Some(after) = condition.publication_after {
+                match self.communication_scope(&task.run_id, &task.assignee) {
+                    Ok(scope) if scope.mode != crate::topology::CommunicationMode::Direct =>
+                        crate::communication::Publications::has_update(&self.workspace.db, &scope, after, condition.sender.as_deref())?.then_some("Получена новая публикация. Прочитайте polymas_read_publications с сохранённого cursor и проверьте актуальное происхождение."),
+                    Ok(_) | Err(Error::Validation(_)) | Err(Error::Denied(_)) => None,
+                    Err(error) => return Err(error),
+                }
+            } else if run.architecture.communication_mode
+                != crate::topology::CommunicationMode::Direct
+                || live.architecture.communication_mode
+                    != crate::topology::CommunicationMode::Direct
+            {
+                None
             } else {
                 if let std::collections::btree_map::Entry::Vacant(entry) =
                     snapshots.entry(run.config_revision)

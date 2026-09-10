@@ -111,12 +111,19 @@ pub struct ApprovalWait {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WaitCondition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_after: Option<i64>,
     pub sender: Option<String>,
     pub correlation_id: Option<String>,
     pub deadline_at: i64,
 }
 impl WaitCondition {
     pub fn validate(&self, timestamp: i64) -> Result<()> {
+        require(
+            self.publication_after
+                .is_none_or(|cursor| cursor >= 0 && self.correlation_id.is_none()),
+            "Для ожидания публикации нужен неотрицательный cursor без correlationId",
+        )?;
         require(
             self.deadline_at > timestamp && self.deadline_at <= timestamp.saturating_add(86400),
             "Ожидание должно иметь срок от 1 секунды до 24 часов",

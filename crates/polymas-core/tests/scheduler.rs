@@ -294,6 +294,7 @@ fn waiting_releases_capacity_preserves_identity_and_requires_a_new_fenced_attemp
         &first.id,
         epoch,
         WaitCondition {
+            publication_after: None,
             sender: Some(r.agents[1].id.clone()),
             correlation_id: None,
             deadline_at: 200,
@@ -337,6 +338,7 @@ fn stopped_or_turn_exhausted_waits_cannot_restart_the_agent() {
             &first.id,
             epoch,
             WaitCondition {
+                publication_after: None,
                 sender: None,
                 correlation_id: None,
                 deadline_at: 100
@@ -352,6 +354,7 @@ fn stopped_or_turn_exhausted_waits_cannot_restart_the_agent() {
             &first.id,
             epoch,
             WaitCondition {
+                publication_after: None,
                 sender: None,
                 correlation_id: None,
                 deadline_at: 200
@@ -366,6 +369,7 @@ fn stopped_or_turn_exhausted_waits_cannot_restart_the_agent() {
         &first.id,
         epoch,
         WaitCondition {
+            publication_after: None,
             sender: None,
             correlation_id: None,
             deadline_at: 200,

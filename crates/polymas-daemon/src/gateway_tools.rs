@@ -36,6 +36,10 @@ pub fn definitions() -> Value {
     value["tools"]
         .as_array_mut()
         .expect("static tools array")
+        .push(crate::gateway_wait::publication_definition());
+    value["tools"]
+        .as_array_mut()
+        .expect("static tools array")
         .extend(crate::gateway_knowledge::definitions());
     value["tools"]
         .as_array_mut()
@@ -97,8 +101,13 @@ async fn dispatch(state: &AppState, scope: &Scope, input: ToolCall) -> Result<Va
                 .await
                 .map(success)
         }
-        "polymas_wait_for_message" => {
-            crate::gateway_wait::request(state, scope, serde_json::from_value(input.arguments)?)
+        "polymas_wait_for_message" | "polymas_wait_for_publication" => {
+            let wait: crate::gateway_wait::WaitInput = serde_json::from_value(input.arguments)?;
+            require(
+                (input.name == "polymas_wait_for_publication") == wait.publication_after.is_some(),
+                "Укажите cursor для publication wait; message wait его не принимает",
+            )?;
+            crate::gateway_wait::request(state, scope, wait)
                 .await
                 .map(success)
         }

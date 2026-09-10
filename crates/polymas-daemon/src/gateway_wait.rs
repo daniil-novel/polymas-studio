@@ -14,6 +14,8 @@ use serde_json::{Value, json};
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WaitInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_after: Option<i64>,
     pub sender: Option<String>,
     pub correlation_id: Option<String>,
     pub timeout_seconds: i64,
@@ -31,15 +33,17 @@ pub struct WaitDirective {
 pub fn definition() -> Value {
     json!({"name":"polymas_wait_for_message","description":"Request continuation after an authorized queued message in this run, or a deadline. Optional sender and correlationId narrow the condition. After this receipt, finish the current turn with a brief public progress summary. PolyMAS parks only after the process exits successfully, then resumes this same agent session. This is intermediate work, not a completed result. Repeating identical arguments in this attempt is safe; changing a pending wait is rejected. Waiting consumes one turn from the role budget.","inputSchema":{"type":"object","properties":{"sender":{"type":["string","null"],"maxLength":200},"correlationId":{"type":["string","null"],"maxLength":200},"timeoutSeconds":{"type":"integer","minimum":1,"maximum":86400},"summary":{"type":"string","minLength":1,"maxLength":20000}},"required":["timeoutSeconds","summary"],"additionalProperties":false},"annotations":{"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}})
 }
+pub fn publication_definition() -> Value {
+    json!({"name":"polymas_wait_for_publication","description":"Wait for a new authorized peer publication after the cursor returned by read_publications, or a deadline, in blackboard/wiki/graph mode. Optional sender narrows the author. First finish reading all existing pages. This does not poll or keep a process slot: after this receipt finish the current turn successfully; PolyMAS reaps it and resumes the exact same session when eligible data appears. On resume call read_publications to retrieve current authorized content. Own publications do not wake this wait. Uses one turn; identical retries within an attempt are safe.","inputSchema":{"type":"object","properties":{"publicationAfter":{"type":"integer","minimum":0},"sender":{"type":["string","null"],"maxLength":200},"timeoutSeconds":{"type":"integer","minimum":1,"maximum":86400},"summary":{"type":"string","minLength":1,"maxLength":20000}},"required":["publicationAfter","timeoutSeconds","summary"],"additionalProperties":false},"annotations":{"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":false}})
+}
 pub async fn request(state: &AppState, scope: &Scope, input: WaitInput) -> Result<Value> {
     let mut engine = state.engine.lock().await;
     validate(&engine, scope)?;
+    let exchange = engine.communication_scope(&scope.run_id, &scope.agent_id)?;
     require(
-        engine
-            .communication_scope(&scope.run_id, &scope.agent_id)?
-            .mode
-            == polymas_core::topology::CommunicationMode::Direct,
-        "Ожидание адресного сообщения недоступно в режиме публикаций",
+        (exchange.mode == polymas_core::topology::CommunicationMode::Direct)
+            == input.publication_after.is_none(),
+        "Тип ожидания не соответствует режиму общения",
     )?;
     crate::gateway_operations::require_previous_resolved(&engine, scope)?;
     require(
@@ -78,6 +82,7 @@ pub async fn request(state: &AppState, scope: &Scope, input: WaitInput) -> Resul
     }
     let timestamp = chrono::Utc::now().timestamp();
     let condition = WaitCondition {
+        publication_after: input.publication_after,
         sender: input.sender.clone(),
         correlation_id: input.correlation_id.clone(),
         deadline_at: timestamp + input.timeout_seconds,
@@ -111,6 +116,6 @@ pub async fn request(state: &AppState, scope: &Scope, input: WaitInput) -> Resul
         directive
     };
     Ok(
-        json!({"state":"wait_requested","condition":directive.condition,"nextAction":"Finish this turn successfully. PolyMAS will free the process slot and resume this same session on the matching message or deadline."}),
+        json!({"state":"wait_requested","condition":directive.condition,"nextAction":"Finish this turn successfully. PolyMAS will free the process slot and resume this same session on matching peer evidence or deadline. In publication mode read publications on resume."}),
     )
 }

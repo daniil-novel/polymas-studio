@@ -4,7 +4,7 @@ use polymas_core::{
     process::ProcessEvent,
     registry::{BatchRequest, RoleDraft},
     scheduler::{TaskInput, TaskState},
-    topology::{Edge, Target},
+    topology::{CommunicationMode, Edge, Target},
     workspace::ConfigCommand,
 };
 use polymas_daemon::{
@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::{mpsc, watch};
 
 struct WaitExecutor {
+    mode: CommunicationMode,
     port: u16,
     agents: Vec<String>,
     sessions: Arc<Mutex<Vec<String>>>,
@@ -28,6 +29,7 @@ impl Executor for WaitExecutor {
         _cancel: watch::Receiver<bool>,
     ) -> Execution {
         let port = self.port;
+        let mode = self.mode;
         let agents = self.agents.clone();
         let sessions = self.sessions.clone();
         Box::pin(async move {
@@ -47,15 +49,24 @@ impl Executor for WaitExecutor {
             let call = if count == 0 {
                 assert_eq!(context["agentId"], agents[0]);
                 assert!(request.session_id.is_none());
-                Some(
-                    json!({"name":"polymas_wait_for_message","arguments":{"sender":agents[1],"timeoutSeconds":60,"summary":"Need fixture evidence"}}),
-                )
+                Some(if mode == CommunicationMode::Direct {
+                    json!({"name":"polymas_wait_for_message","arguments":{"sender":agents[1],"timeoutSeconds":60,"summary":"Need fixture evidence"}})
+                } else {
+                    json!({"name":"polymas_wait_for_publication","arguments":{"sender":agents[1],"publicationAfter":0,"timeoutSeconds":60,"summary":"Need fixture evidence"}})
+                })
             } else if count == 1 {
                 assert_eq!(context["agentId"], agents[1]);
                 assert!(request.session_id.is_none());
-                Some(
-                    json!({"name":"polymas_send_message","arguments":{"idempotencyKey":"wake-once","message":{"recipient":agents[0],"body":"WAIT-RESUME-73"}}}),
-                )
+                Some(if mode == CommunicationMode::Direct {
+                    json!({"name":"polymas_send_message","arguments":{"idempotencyKey":"wake-once","message":{"recipient":agents[0],"body":"WAIT-RESUME-73"}}})
+                } else {
+                    let mut args =
+                        json!({"key":"wake-once","title":"Evidence","body":"WAIT-RESUME-73"});
+                    if mode == CommunicationMode::Wiki {
+                        args["slug"] = json!("evidence");
+                    }
+                    json!({"name":"polymas_publish","arguments":args})
+                })
             } else {
                 assert_eq!(context["agentId"], agents[0]);
                 let expected = sessions.lock().unwrap()[0].clone();
@@ -64,10 +75,16 @@ impl Executor for WaitExecutor {
                     Some(expected.as_str()),
                     "newSession applies only to the initial turn; continuation must resume the exact same session"
                 );
-                assert!(request.prompt.contains("WAIT-RESUME-73"));
+                if mode == CommunicationMode::Direct {
+                    assert!(request.prompt.contains("WAIT-RESUME-73"));
+                }
                 assert!(request.prompt.contains("ПРИЧИНА ПРОДОЛЖЕНИЯ"));
                 first_session = Some(expected);
-                None
+                if mode == CommunicationMode::Direct {
+                    None
+                } else {
+                    Some(json!({"name":"polymas_read_publications","arguments":{}}))
+                }
             };
             if let Some(body) = call {
                 let result: Value = client
@@ -81,6 +98,9 @@ impl Executor for WaitExecutor {
                     .await
                     .unwrap();
                 assert_eq!(result["isError"], false, "{result}");
+                if count == 2 {
+                    assert!(result.to_string().contains("WAIT-RESUME-73"));
+                }
             }
             // This executor models a successfully reaped turn, not a provider or OS process.
             let session_id = first_session.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
@@ -103,6 +123,19 @@ impl Executor for WaitExecutor {
 }
 #[tokio::test]
 async fn yielding_releases_capacity_and_message_wakes_the_exact_same_agent_session() {
+    run_wait(CommunicationMode::Direct).await;
+}
+#[tokio::test]
+async fn publications_wake_the_same_session_at_capacity_one_for_each_shared_mode() {
+    for mode in [
+        CommunicationMode::Blackboard,
+        CommunicationMode::Wiki,
+        CommunicationMode::Graph,
+    ] {
+        run_wait(mode).await;
+    }
+}
+async fn run_wait(mode: CommunicationMode) {
     let dir = tempfile::tempdir().unwrap();
     let mut engine = Engine::open(dir.path()).unwrap();
     let role = engine
@@ -141,6 +174,7 @@ async fn yielding_releases_capacity_and_message_wakes_the_exact_same_agent_sessi
         .map(|a| a.id.clone())
         .collect();
     let mut architecture = engine.workspace.config().value.architecture.clone();
+    architecture.communication_mode = mode;
     architecture.edges = vec![Edge {
         from: agents[1].clone(),
         to: agents[0].clone(),
@@ -183,6 +217,7 @@ async fn yielding_releases_capacity_and_message_wakes_the_exact_same_agent_sessi
     let sessions = Arc::new(Mutex::new(vec![]));
     let options = RuntimeOptions::new(
         Arc::new(WaitExecutor {
+            mode,
             port,
             agents: agents.clone(),
             sessions: sessions.clone(),

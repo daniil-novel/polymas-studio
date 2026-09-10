@@ -289,6 +289,7 @@ fn durable_wait_resumes_on_a_matching_message_or_deadline_without_replaying_a_pr
         &task.id,
         epoch,
         WaitCondition {
+            publication_after: None,
             sender: Some(ids[1].clone()),
             correlation_id: None,
             deadline_at: 200,
@@ -340,6 +341,7 @@ fn durable_wait_resumes_on_a_matching_message_or_deadline_without_replaying_a_pr
         &task.id,
         resumed.lease.unwrap().epoch,
         WaitCondition {
+            publication_after: None,
             sender: Some(ids[1].clone()),
             correlation_id: Some("not-yet-created-conversation".into()),
             deadline_at: 110,
